@@ -3,8 +3,10 @@
 ## 基础信息
 
 - **Base URL**: `http://localhost:3010`
-- **认证方式**: JWT Bearer Token
+- **认证方式**: Session Bearer Token
 - **Content-Type**: `application/json`
+
+> 登录成功后返回的是 `sessionId`，后续请求使用 `Authorization: Bearer <sessionId>`。
 
 ## 认证流程
 
@@ -41,7 +43,7 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "sessionId": "session_xxxxxxxxxxxxxxxx",
     "user": {
       "username": "admin",
       "isInitialized": true
@@ -62,10 +64,10 @@ Content-Type: application/json
 }
 ```
 
-### 4. 验证 Token
+### 4. 验证 Session
 ```http
 GET /auth/verify
-Authorization: Bearer <token>
+Authorization: Bearer <sessionId>
 ```
 
 ## 配置管理
@@ -73,7 +75,7 @@ Authorization: Bearer <token>
 ### 获取系统配置
 ```http
 GET /api/config
-Authorization: Bearer <token>
+Authorization: Bearer <sessionId>
 ```
 
 **响应示例**:
@@ -83,15 +85,33 @@ Authorization: Bearer <token>
   "data": {
     "id": 1,
     "username": "admin",
-    "bot_token": "123456:ABC-DEF...",
-    "chat_id": "123456789",
-    "bound_user_name": "John Doe",
-    "bound_user_username": "johndoe",
-    "stop_push": 0,
-    "only_title": 0,
-    "rss_url": "https://rss.nodeseek.com/",
-    "rss_interval_seconds": 60,
-    "rss_proxy": null,
+     "bot_token": "123456:ABC-DEF...",
+     "chat_id": "123456789",
+     "bound_user_name": "John Doe",
+     "bound_user_username": "johndoe",
+     "stop_push": 0,
+     "only_title": 0,
+     "serverchan_enabled": 1,
+     "serverchan_uid": "your_uid",
+     "serverchan_sendkey": "your_sendkey",
+     "meow_enabled": 1,
+     "meow_endpoint": "https://api.chuckfang.com",
+     "meow_nickname": "your_nickname",
+     "telegram_last_test_status": "success",
+     "telegram_last_test_at": "2026-04-18T12:00:00.000Z",
+     "telegram_last_send_at": "2026-04-18T12:10:00.000Z",
+     "telegram_last_error": "",
+     "serverchan_last_test_status": "success",
+     "serverchan_last_test_at": "2026-04-18T12:01:00.000Z",
+     "serverchan_last_send_at": "2026-04-18T12:11:00.000Z",
+     "serverchan_last_error": "",
+     "meow_last_test_status": "failed",
+     "meow_last_test_at": "2026-04-18T12:02:00.000Z",
+     "meow_last_send_at": null,
+     "meow_last_error": "MeoW 昵称未配置",
+     "rss_url": "https://rss.nodeseek.com/",
+     "rss_interval_seconds": 60,
+     "rss_proxy": null,
     "created_at": "2024-01-01T00:00:00.000Z",
     "updated_at": "2024-01-01T00:00:00.000Z"
   }
@@ -101,23 +121,64 @@ Authorization: Bearer <token>
 ### 更新系统配置
 ```http
 PUT /api/config
-Authorization: Bearer <token>
+Authorization: Bearer <sessionId>
 Content-Type: application/json
 
 {
   "chat_id": "987654321",
   "stop_push": 0,
   "only_title": 1,
+  "serverchan_enabled": 1,
+  "serverchan_uid": "your_uid",
+  "serverchan_sendkey": "your_sendkey",
+  "meow_enabled": 1,
+  "meow_endpoint": "https://api.chuckfang.com",
+  "meow_nickname": "your_nickname",
   "rss_url": "https://rss.nodeseek.com/",
   "rss_interval_seconds": 60,
   "rss_proxy": "http://127.0.0.1:7890"
 }
 ```
 
+### 通知通道测试接口
+
+#### Telegram 测试发送
+```http
+POST /api/push/test-send
+Authorization: Bearer <sessionId>
+Content-Type: application/json
+
+{
+  "message": "📡 NodeSeeker 推送测试"
+}
+```
+
+#### Server酱 测试发送
+```http
+POST /api/notifications/serverchan/test
+Authorization: Bearer <sessionId>
+Content-Type: application/json
+
+{
+  "message": "📡 NodeSeeker Server酱 推送测试"
+}
+```
+
+#### MeoW 测试发送
+```http
+POST /api/notifications/meow/test
+Authorization: Bearer <sessionId>
+Content-Type: application/json
+
+{
+  "message": "📡 NodeSeeker MeoW 推送测试"
+}
+```
+
 ### 设置 Telegram Bot Token
 ```http
 POST /api/bot-token
-Authorization: Bearer <token>
+Authorization: Bearer <sessionId>
 Content-Type: application/json
 
 {
@@ -451,7 +512,7 @@ Authorization: Bearer <token>
 
 ### 发送测试消息
 ```http
-POST /telegram/test-message
+POST /api/push/test-send
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -506,6 +567,24 @@ interface BaseConfig {
   bound_user_username?: string;
   stop_push: number;
   only_title: number;
+  serverchan_enabled?: number;
+  serverchan_uid?: string;
+  serverchan_sendkey?: string;
+  meow_enabled?: number;
+  meow_endpoint?: string;
+  meow_nickname?: string;
+  telegram_last_test_status?: string;
+  telegram_last_test_at?: string;
+  telegram_last_send_at?: string;
+  telegram_last_error?: string;
+  serverchan_last_test_status?: string;
+  serverchan_last_test_at?: string;
+  serverchan_last_send_at?: string;
+  serverchan_last_error?: string;
+  meow_last_test_status?: string;
+  meow_last_test_at?: string;
+  meow_last_send_at?: string;
+  meow_last_error?: string;
   rss_url?: string;           // RSS 源地址
   rss_interval_seconds?: number;  // 抓取间隔秒数
   rss_proxy?: string;         // HTTP/HTTPS 代理地址
@@ -523,7 +602,7 @@ interface Post {
   memo: string;
   category: string;
   creator: string;
-  push_status: number; // 0: 未推送, 1: 已推送, 2: 无需推送
+  push_status: number; // 0: 待处理, 1: 已匹配未成功推送, 2: 无需推送, 3: 已推送成功
   sub_id?: number;
   pub_date: string;
   push_date?: string;
@@ -550,7 +629,7 @@ interface KeywordSub {
 ### JavaScript/Node.js
 ```javascript
 const API_BASE = 'http://localhost:3010';
-let token = '';
+let sessionId = '';
 
 // 登录
 async function login(username, password) {
@@ -564,7 +643,7 @@ async function login(username, password) {
   
   const result = await response.json();
   if (result.success) {
-    token = result.data.token;
+    sessionId = result.data.sessionId;
   }
   return result;
 }
@@ -573,7 +652,7 @@ async function login(username, password) {
 async function getPosts(page = 1, limit = 20) {
   const response = await fetch(`${API_BASE}/api/posts?page=${page}&limit=${limit}`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${sessionId}`,
     },
   });
   
@@ -586,7 +665,7 @@ async function addSubscription(keywords) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${sessionId}`,
     },
     body: JSON.stringify({
       keyword1: keywords[0],
@@ -616,7 +695,7 @@ class NodeSeekerAPI:
         
         result = response.json()
         if result['success']:
-            self.token = result['data']['token']
+        self.token = result['data']['sessionId']
         return result
     
     def get_posts(self, page=1, limit=20):

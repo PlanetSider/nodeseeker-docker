@@ -5,7 +5,7 @@
 [![Docker Hub](https://img.shields.io/docker/v/ersichub/nodeseeker?label=Docker%20Hub)](https://hub.docker.com/r/ersichub/nodeseeker)
 [![Bun](https://img.shields.io/badge/Bun-1.0+-ff69b4.svg)](https://bun.sh/)
 
-基于 **Bun + Hono.js + SQLite** 的 NodeSeek 社区 RSS 监控与 Telegram 推送系统。
+基于 **Bun + Hono.js + SQLite** 的 NodeSeek 社区 RSS 监控与多通道通知系统，支持 Telegram、Server酱 和 MeoW 推送。
 
 ## ✨ 功能特性
 
@@ -13,10 +13,11 @@
 |------|------|
 | 🔄 自动 RSS 抓取 | 定时抓取 NodeSeek 社区 RSS，支持自定义间隔与代理 |
 | 🎯 智能关键词匹配 | 多关键词组合 + 正则表达式，按创建者/分类过滤 |
-| 📱 Telegram 推送 | Bot 实时推送匹配文章，支持命令管理订阅 |
+| 📱 多通道通知 | Telegram、Server酱、MeoW 推送，支持独立开关与测试发送 |
 | 🌐 Web 控制台 | RESTful API + 可视化管理界面 |
-| 🔐 安全认证 | JWT 认证 + 密码加密存储 |
+| 🔐 安全认证 | Session 认证 + 密码加密存储 |
 | 📊 实时统计 | 推送统计与系统监控 |
+| 🩺 健康面板 | 展示最近测试结果、最近发送时间、最近错误信息 |
 | 📲 PWA 支持 | 离线访问、安装到桌面、推送通知 |
 
 ## 🚀 快速开始
@@ -91,12 +92,33 @@ bun test             # 运行测试
 ## 🔧 初始化配置
 
 1. 访问 http://localhost:3010，创建管理员账户
-2. **配置 Telegram Bot**（可选）：
+2. **配置通知通道**（可选）：
    - 在 Telegram 中通过 [@BotFather](https://t.me/BotFather) 创建 Bot 并获取 Token
    - 在控制台配置 Bot Token，向 Bot 发送 `/start` 完成绑定
+   - 在控制台可额外配置 `Server酱` 的 `UID + SendKey`
+   - 在控制台可额外配置 `MeoW` 的 `接口地址 + 昵称`
+   - 三个通道都支持单独开关和测试发送
 3. **配置 RSS 源**（可选）：
-   - 控制台 → 基础设置 → RSS 抓取设置
-   - 可修改源地址、间隔、代理，支持 **测试连接**
+    - 控制台 → 基础设置 → RSS 抓取设置
+    - 可修改源地址、间隔、代理，支持 **测试连接**
+
+## 🔔 通知通道
+
+当前支持 3 条通知通道，消息内容使用统一模板：
+
+| 通道 | 配置项 | 发送方式 | 说明 |
+|------|--------|----------|------|
+| Telegram | `Bot Token`、`Chat ID` | Bot API | 支持交互命令、Webhook、Polling |
+| Server酱 | `UID`、`SendKey` | `POST` JSON | 推送内容与 Telegram 一致 |
+| MeoW | `接口地址`、`昵称` | `POST` JSON | 默认接口地址为 `https://api.chuckfang.com` |
+
+管理界面中的 **通知通道总览** 会展示：
+
+1. 通道启用状态
+2. 配置完整性
+3. 最近一次测试结果
+4. 最近一次发送时间
+5. 最近错误信息
 
 ## 🤖 Telegram Bot 命令
 
@@ -147,7 +169,9 @@ src/
 |------|----------|
 | 端口冲突 | 修改 `.env` 中的 `PORT` |
 | 数据库权限 | 确保 `data/` 目录有写权限 |
-| Telegram Bot 无响应 | 检查 Token 并发送 `/start` 绑定 |
+| Telegram Bot 无响应 | 检查 Token、Chat ID，并发送 `/start` 绑定 |
+| Server酱 测试失败 | 检查 UID、SendKey 是否正确 |
+| MeoW 测试失败 | 检查昵称、接口地址是否正确可达 |
 | RSS 抓取失败 | 检查网络 / RSS 源可用性 / 代理设置 |
 | RSS 配置不生效 | 修改间隔后点击 **重启任务** |
 
