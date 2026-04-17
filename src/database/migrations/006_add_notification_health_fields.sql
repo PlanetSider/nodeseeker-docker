@@ -1,0 +1,12 @@
+ALTER TABLE base_config ADD COLUMN telegram_last_test_status TEXT;
+ALTER TABLE base_config ADD COLUMN telegram_last_test_at TEXT;
+ALTER TABLE base_config ADD COLUMN telegram_last_send_at TEXT;
+ALTER TABLE base_config ADD COLUMN telegram_last_error TEXT;
+ALTER TABLE base_config ADD COLUMN serverchan_last_test_status TEXT;
+ALTER TABLE base_config ADD COLUMN serverchan_last_test_at TEXT;
+ALTER TABLE base_config ADD COLUMN serverchan_last_send_at TEXT;
+ALTER TABLE base_config ADD COLUMN serverchan_last_error TEXT;
+ALTER TABLE base_config ADD COLUMN meow_last_test_status TEXT;
+ALTER TABLE base_config ADD COLUMN meow_last_test_at TEXT;
+ALTER TABLE base_config ADD COLUMN meow_last_send_at TEXT;
+ALTER TABLE base_config ADD COLUMN meow_last_error TEXT;
