@@ -15,7 +15,7 @@ on:
 env:
   GHCR_REGISTRY: ghcr.io
   DOCKERHUB_REGISTRY: docker.io
-  GHCR_IMAGE_NAME: ljnchn/nodeseeker-docker
+  GHCR_IMAGE_NAME: ${{ github.repository_owner }}/nodeseeker-docker
   DOCKERHUB_IMAGE_NAME: ersichub/nodeseeker
 
 jobs:
@@ -56,7 +56,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/bun.lockb') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
@@ -143,7 +143,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub (only for main & tags)
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
         uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKERHUB_REGISTRY }}
@@ -162,7 +162,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Extract metadata for Docker Hub
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
         id: meta-dockerhub
         uses: docker/metadata-action@v5
         with:
@@ -181,11 +181,11 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-ghcr.outputs.tags }}
           labels: ${{ steps.meta-ghcr.outputs.labels }}
-          cache-from: type=gha,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE_NAME }}:cache
-          cache-to: type=gha,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE_NAME }}:cache,mode=max
+          cache-from: type=gha,scope=ghcr
+          cache-to: type=gha,scope=ghcr,mode=max
 
       - name: Build and push to Docker Hub
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
         id: build-dockerhub
         uses: docker/build-push-action@v5
         with:
@@ -194,6 +194,8 @@ jobs:
           push: true
           tags: ${{ steps.meta-dockerhub.outputs.tags }}
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
+          cache-from: type=gha,scope=dockerhub
+          cache-to: type=gha,scope=dockerhub,mode=max
 
 
   release:
@@ -224,13 +226,13 @@ jobs:
           TAG=${GITHUB_REF#refs/tags/}
           echo "### Docker Images" > release_notes.md
           echo "- GHCR: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE_NAME }}:${TAG}" >> release_notes.md
-          echo "- Docker Hub: ${{ env.DOCKERHUB_IMAGE_NAME }}:${TAG}" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "**Digests:**" >> release_notes.md
-          echo "- GHCR: ${{ steps.build-ghcr.outputs.digest }}" >> release_notes.md
-          if [ -n "${{ steps.build-dockerhub.outputs.digest }}" ]; then
-            echo "- Docker Hub: ${{ steps.build-dockerhub.outputs.digest }}" >> release_notes.md
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "- Docker Hub: ${{ env.DOCKERHUB_IMAGE_NAME }}:${TAG}" >> release_notes.md
+          else
+            echo "- Docker Hub: skipped (DOCKERHUB secrets not configured)" >> release_notes.md
           fi
+          echo "" >> release_notes.md
+          echo "Digests are available in the docker job logs and published package metadata." >> release_notes.md
 
       - name: Update / Create Release with notes
         uses: softprops/action-gh-release@v2
