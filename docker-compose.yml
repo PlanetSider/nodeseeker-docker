@@ -1,26 +1,28 @@
-version: '3.8'
-
 services:
   nodeseeker:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: nodeseeker-app
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "3010:3010"
     environment:
-      - NODE_ENV=production
-      - PORT=3010
-      - HOST=0.0.0.0
-      - DATABASE_PATH=/usr/src/app/data/nodeseeker.db
-      - RSS_URL=${RSS_URL:-https://rss.nodeseek.com/}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3010}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3010}
+      HOST: ${HOST:-0.0.0.0}
+      DATABASE_PATH: /usr/src/app/data/nodeseeker.db
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3010}
+      RSS_TIMEOUT: ${RSS_TIMEOUT:-10000}
+      RSS_CHECK_ENABLED: ${RSS_CHECK_ENABLED:-true}
+      RSS_PLAYWRIGHT_FALLBACK: ${RSS_PLAYWRIGHT_FALLBACK:-true}
+      PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
     volumes:
-      # 持久化数据库文件
-      - nodeseeker_data:/usr/src/app/data
-      # 日志目录
-      - nodeseeker_logs:/usr/src/app/logs
-      # 环境变量文件（可选）
-      # - ./.env:/usr/src/app/.env:ro
+      - ./data:/usr/src/app/data
+      - ./logs:/usr/src/app/logs
     networks:
       - nodeseeker_network
     healthcheck:
@@ -34,12 +36,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  nodeseeker_data:
-    driver: local
-  nodeseeker_logs:
-    driver: local
 
 networks:
   nodeseeker_network:

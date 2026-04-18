@@ -1,6 +1,6 @@
 # NodeSeeker Docker
 
-[![Docker Build](https://github.com/ljnchn/NodeSeeker-docker/actions/workflows/docker-build.yml/badge.svg)](https://github.com/ljnchn/NodeSeeker-docker/actions/workflows/docker-build.yml)
+[![Docker Build](https://github.com/PlanetSider/nodeseeker-docker/actions/workflows/docker-build.yml/badge.svg)](https://github.com/PlanetSider/nodeseeker-docker/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Hub](https://img.shields.io/docker/v/ersichub/nodeseeker?label=Docker%20Hub)](https://hub.docker.com/r/ersichub/nodeseeker)
 [![Bun](https://img.shields.io/badge/Bun-1.0+-ff69b4.svg)](https://bun.sh/)
@@ -28,8 +28,10 @@
 docker run -d \
   --name nodeseeker \
   -p 3010:3010 \
-  -v nodeseeker_data:/usr/src/app/data \
-  ersichub/nodeseeker:latest
+  -v ./data:/usr/src/app/data \
+  -v ./logs:/usr/src/app/logs \
+  --env-file .env \
+  ghcr.io/planetsider/nodeseeker-docker:latest
 ```
 
 访问 http://localhost:3010，首次使用时创建管理员账户即可。
@@ -37,17 +39,26 @@ docker run -d \
 ### Docker Compose
 
 ```bash
-git clone https://github.com/ljnchn/NodeSeeker-docker.git
-cd NodeSeeker-docker
+git clone https://github.com/PlanetSider/nodeseeker-docker.git
+cd nodeseeker-docker
 
-# （可选）配置环境变量
+# （推荐）复制环境变量模板
 cp .env.example .env
 
-# 启动
-docker-compose up -d
+# 使用本地 Dockerfile 构建并启动
+docker compose up -d --build
 ```
 
-> 生产环境请使用 `docker-compose -f docker-compose.prod.yml up -d`，详见 [Docker 部署文档](docs/Docker.md)。
+> `docker-compose.yml` 适合本地直接构建运行；`docker-compose.prod.yml` 默认使用 GHCR 中已发布的镜像，适合服务器部署。
+
+### 生产环境 Compose
+
+```bash
+# 拉取最新镜像并启动
+docker compose -f docker-compose.prod.yml up -d
+```
+
+生产环境默认镜像：`ghcr.io/planetsider/nodeseeker-docker:latest`
 
 ### 本地开发
 
@@ -92,6 +103,24 @@ bun test             # 运行测试
 > **RSS 源地址、抓取间隔、代理** 等配置已迁移到数据库，可在 Web 控制台 → **基础设置** 中动态修改。
 
 当 RSS 源出现 TLS、反爬、连接中断等问题时，服务会在普通 `fetch` 抓取失败后自动尝试 Playwright 浏览器兜底，以提高抓取成功率。
+
+Docker Compose 中仍建议保留 `.env`，用于控制服务端口、CORS、RSS 超时、Playwright fallback、Webhook 覆盖等基础运行参数。
+
+## 🐳 部署说明
+
+当前仓库中的 Compose 文件职责如下：
+
+1. `docker-compose.yml`
+   适合本地或测试环境，直接使用仓库里的 `Dockerfile` 构建镜像。
+2. `docker-compose.prod.yml`
+   适合生产环境，直接拉取 `ghcr.io/planetsider/nodeseeker-docker:latest`。
+
+两个文件都会：
+
+1. 读取项目根目录下的 `.env`
+2. 挂载 `./data` 到容器数据库目录
+3. 挂载 `./logs` 到容器日志目录
+4. 暴露 `3010` 端口
 
 ## 🔧 初始化配置
 

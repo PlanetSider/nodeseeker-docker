@@ -1,205 +1,229 @@
 # NodeSeeker Docker 部署指南
 
-本指南将帮助你使用 Docker 部署 NodeSeeker 应用。
+本项目当前提供两种 Docker 部署方式：
+
+1. 使用仓库内的 `Dockerfile` 本地构建镜像
+2. 直接拉取 GHCR 已发布镜像运行
 
 ## 文件说明
 
-- `Dockerfile` - Docker 镜像构建文件
-- `docker-compose.yml` - 开发环境 Docker Compose 配置
-- `docker-compose.prod.yml` - 生产环境 Docker Compose 配置
-- `.dockerignore` - Docker 构建忽略文件
-- `deploy.sh` - 部署脚本（Linux/macOS）
+1. `Dockerfile`
+   用于构建应用镜像，基于 Bun 运行时，并内置 Playwright Chromium 依赖。
+2. `docker-compose.yml`
+   适合本地开发、测试或自建环境，直接从当前仓库构建镜像。
+3. `docker-compose.prod.yml`
+   适合生产环境，默认拉取 `ghcr.io/planetsider/nodeseeker-docker:latest`。
+4. `.dockerignore`
+   Docker 构建上下文忽略规则。
+5. `.env.example`
+   环境变量模板。
 
 ## 快速开始
 
-### 开发环境
-
-1. 确保已安装 Docker 和 Docker Compose
-2. 克隆项目到本地
-3. 运行以下命令：
+### 方式一：直接运行 GHCR 镜像
 
 ```bash
-# 构建并启动服务
-docker-compose up --build -d
-
-# 查看服务状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f nodeseeker
+docker run -d \
+  --name nodeseeker \
+  -p 3010:3010 \
+  -v ./data:/usr/src/app/data \
+  -v ./logs:/usr/src/app/logs \
+  --env-file .env \
+  ghcr.io/planetsider/nodeseeker-docker:latest
 ```
 
-应用将在 http://localhost:3010 启动。
+访问 `http://localhost:3010`，首次使用时创建管理员账户。
 
-### 生产环境
-
-1. 设置环境变量：
+### 方式二：使用本地 Compose 构建运行
 
 ```bash
-export JWT_SECRET="your-super-secret-jwt-key"
-export TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
-export TELEGRAM_WEBHOOK_URL="https://your-domain.com/telegram/webhook"
+cp .env.example .env
+docker compose up -d --build
 ```
 
-2. 部署应用：
+这会：
+
+1. 根据当前仓库 `Dockerfile` 构建镜像
+2. 启动应用容器
+3. 挂载本地 `./data` 和 `./logs`
+
+### 方式三：生产环境 Compose
 
 ```bash
-# 使用生产配置启动
-docker-compose -f docker-compose.prod.yml up --build -d
-
-# 查看服务状态
-docker-compose -f docker-compose.prod.yml ps
+cp .env.example .env
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-## 使用部署脚本（Linux/macOS）
+这会直接拉取：
 
-部署脚本提供了便捷的部署和管理功能：
+```text
+ghcr.io/planetsider/nodeseeker-docker:latest
+```
+
+## 环境变量
+
+项目支持零配置启动，但建议通过 `.env` 显式管理运行参数。
+
+当前仍由环境变量控制的主要项目：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | `3010` | 服务端口 |
+| `HOST` | `0.0.0.0` | 服务监听地址 |
+| `CORS_ORIGINS` | `http://localhost:3010` | 允许的跨域源 |
+| `RSS_TIMEOUT` | `10000` | RSS 请求超时 |
+| `RSS_CHECK_ENABLED` | `true` | 是否启用定时 RSS 抓取 |
+| `RSS_PLAYWRIGHT_FALLBACK` | `true` | 普通 RSS 抓取失败时是否启用 Playwright 兜底 |
+| `PLAYWRIGHT_HEADLESS` | `true` | Playwright 是否使用无头模式 |
+| `TELEGRAM_WEBHOOK_URL` | 空 | 可选覆盖 Telegram Webhook URL |
+| `LOG_LEVEL` | `info` | 日志级别 |
+
+以下业务配置已经迁移到数据库和 Web 管理界面：
+
+1. RSS 源地址
+2. RSS 抓取间隔
+3. RSS 代理
+4. Telegram Bot Token
+5. Telegram Chat ID
+6. Server酱 配置
+7. MeoW 配置
+
+## 数据与日志目录
+
+Compose 文件默认使用以下宿主机目录挂载：
+
+1. `./data` -> `/usr/src/app/data`
+2. `./logs` -> `/usr/src/app/logs`
+
+这样更适合：
+
+1. 直接备份 SQLite 数据库
+2. 检查运行日志
+3. 在本机和服务器上保持一致的目录结构
+
+## Playwright 兜底说明
+
+镜像中已包含 Playwright Chromium 所需依赖，用于 RSS 抓取兜底。
+
+工作方式：
+
+1. 默认先使用普通 `fetch` 抓取 RSS
+2. 如果出现 TLS、反爬、连接中断等问题
+3. 自动回退到 Playwright 浏览器抓取
+
+如果你不希望启用兜底，可在 `.env` 中设置：
 
 ```bash
-# 给脚本执行权限
-chmod +x deploy.sh
-
-# 部署开发环境
-./deploy.sh deploy dev
-
-# 部署生产环境
-./deploy.sh deploy prod
-
-# 查看日志
-./deploy.sh logs prod
-
-# 停止服务
-./deploy.sh stop prod
-
-# 重启服务
-./deploy.sh restart prod
-
-# 清理未使用的资源
-./deploy.sh clean
+RSS_PLAYWRIGHT_FALLBACK=false
 ```
 
-## Windows 部署
+## 常用命令
 
-在 Windows 上，你可以直接使用 Docker Compose 命令：
+### 查看服务状态
 
-```powershell
-# 开发环境
-docker-compose up --build -d
-
-# 生产环境
-docker-compose -f docker-compose.prod.yml up --build -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
+```bash
+docker compose ps
+docker compose -f docker-compose.prod.yml ps
 ```
-
-## 配置说明
-
-### 环境变量
-
-生产环境需要设置以下环境变量：
-
-- `JWT_SECRET` - JWT 密钥（必需）
-- `TELEGRAM_BOT_TOKEN` - Telegram 机器人令牌（可选）
-- `TELEGRAM_WEBHOOK_URL` - Telegram Webhook URL（可选）
-
-### 数据持久化
-
-- 开发环境：数据存储在 Docker 卷中
-- 生产环境：数据存储在 `/opt/nodeseeker/data` 目录
-
-
-## 监控和日志
 
 ### 查看日志
 
 ```bash
-# 查看应用日志
-docker-compose logs -f nodeseeker
-
-# 查看 Nginx 日志
-docker-compose logs -f nginx
-
-# 查看所有服务日志
-docker-compose logs -f
+docker compose logs -f nodeseeker
+docker compose -f docker-compose.prod.yml logs -f nodeseeker
 ```
 
-### 健康检查
+### 停止服务
 
-应用包含健康检查端点 `/health`，Docker 会自动监控服务状态。
+```bash
+docker compose down
+docker compose -f docker-compose.prod.yml down
+```
 
-### 自动更新（生产环境）
+### 重新构建本地镜像
 
-生产配置包含 Watchtower 服务，可以自动更新容器镜像。
+```bash
+docker compose up -d --build
+```
+
+### 拉取最新生产镜像
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+## 健康检查
+
+镜像内置健康检查：
+
+```text
+GET /health
+```
+
+你也可以手动检查：
+
+```bash
+curl http://localhost:3010/health
+```
+
+## 自动更新
+
+`docker-compose.prod.yml` 默认带有 `watchtower` 服务，可用于自动更新生产镜像。
+
+如果你不需要自动更新，可以直接删掉或注释掉 `watchtower` 服务。
 
 ## 故障排除
 
-### 常见问题
-
-1. **端口冲突**
-   ```bash
-   # 检查端口占用
-   netstat -tulpn | grep :3010
-   # 或者修改 docker-compose.yml 中的端口映射
-   ```
-
-2. **权限问题**
-   ```bash
-   # 确保数据目录权限正确
-   sudo chown -R $USER:$USER /opt/nodeseeker/data
-   ```
-
-3. **容器无法启动**
-   ```bash
-   # 查看详细错误信息
-   docker-compose logs nodeseeker
-   ```
-
-### 重置环境
+### 1. 容器无法启动
 
 ```bash
-# 停止并删除所有容器、网络、卷
-docker-compose down -v
-
-# 清理未使用的资源
-docker system prune -a
+docker compose logs nodeseeker
 ```
 
-## 备份和恢复
+重点检查：
 
-### 备份数据
+1. `./data` 目录是否可写
+2. 端口 `3010` 是否被占用
+3. `.env` 配置是否有非法值
+
+### 2. RSS 抓取失败
+
+先检查：
+
+1. RSS 源是否可访问
+2. 网络或代理是否异常
+3. Playwright fallback 是否已启用
+
+### 3. 生产环境拉不到镜像
+
+确认以下镜像是否存在：
+
+```text
+ghcr.io/planetsider/nodeseeker-docker:latest
+```
+
+如果仓库是私有或访问受限，需要先登录 GHCR。
+
+### 4. 数据迁移问题
+
+数据库文件挂载在：
+
+```text
+/usr/src/app/data/nodeseeker.db
+```
+
+升级镜像前建议先备份 `./data` 目录。
+
+## 备份建议
+
+最直接的备份方式是备份宿主机目录：
+
+1. `./data`
+2. `./logs`
+
+例如：
 
 ```bash
-# 备份数据库
-docker cp nodeseeker-app:/usr/src/app/data/nodeseeker.db ./backup/
-
-# 或者直接备份数据卷
-docker run --rm -v nodeseeker_data:/data -v $(pwd):/backup alpine tar czf /backup/nodeseeker-backup.tar.gz -C /data .
+tar czf nodeseeker-backup.tar.gz data logs
 ```
-
-### 恢复数据
-
-```bash
-# 恢复数据库
-docker cp ./backup/nodeseeker.db nodeseeker-app:/usr/src/app/data/
-
-# 或者恢复整个数据卷
-docker run --rm -v nodeseeker_data:/data -v $(pwd):/backup alpine tar xzf /backup/nodeseeker-backup.tar.gz -C /data
-```
-
-## 性能优化
-
-1. **资源限制**：在 docker-compose.yml 中添加内存和 CPU 限制
-2. **日志轮转**：配置日志轮转以防止日志文件过大
-
-## 安全建议
-
-1. 使用强密码和密钥
-2. 定期更新 Docker 镜像
-3. 配置防火墙规则
-4. 启用 HTTPS
-5. 定期备份数据
-6. 监控系统资源使用情况
