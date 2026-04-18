@@ -2,13 +2,24 @@ import { DatabaseService } from "./database";
 import { getEnvConfig } from "../config/env";
 import { logger } from "../utils/logger";
 import type { Post, RSSItem, ParsedPost, RSSProcessResult } from "../types";
+import { RSSBrowserService } from "./rssBrowser";
 
 export class RSSService {
   private readonly TIMEOUT: number;
+  private readonly PLAYWRIGHT_FALLBACK: boolean;
+  private readonly rssBrowserService: RSSBrowserService;
 
   constructor(private dbService: DatabaseService) {
     const config = getEnvConfig();
     this.TIMEOUT = config.RSS_TIMEOUT;
+    this.PLAYWRIGHT_FALLBACK = config.RSS_PLAYWRIGHT_FALLBACK;
+    this.rssBrowserService = new RSSBrowserService();
+  }
+
+  private async fetchWithPlaywright(url: string): Promise<RSSItem[]> {
+    logger.rss(`普通抓取失败，尝试 Playwright 兜底: ${url}`);
+    const xmlText = await this.rssBrowserService.fetchRSSContent(url);
+    return this.parseRSSXML(xmlText);
   }
 
   /**
@@ -200,6 +211,16 @@ export class RSSService {
         }
       }
       
+      if (this.PLAYWRIGHT_FALLBACK) {
+        try {
+          const rssConfig = this.getRSSConfig();
+          return await this.fetchWithPlaywright(rssConfig.url);
+        } catch (playwrightError) {
+          logger.error('Playwright RSS 兜底失败:', playwrightError);
+          throw new Error(`RSS 抓取失败: ${errorMessage}；Playwright 兜底也失败: ${playwrightError}`);
+        }
+      }
+
       throw new Error(`RSS 抓取失败: ${errorMessage}`);
     }
   }

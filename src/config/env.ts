@@ -19,6 +19,14 @@ const envSchema = z.object({
     .string()
     .transform((val) => val !== "false")
     .default("true"),
+  RSS_PLAYWRIGHT_FALLBACK: z
+    .string()
+    .transform((val) => val !== "false")
+    .default("true"),
+  PLAYWRIGHT_HEADLESS: z
+    .string()
+    .transform((val) => val !== "false")
+    .default("true"),
 
   // Telegram (Optional)
   TELEGRAM_WEBHOOK_URL: z.string().url().optional(),

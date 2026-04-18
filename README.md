@@ -11,7 +11,7 @@
 
 | 功能 | 说明 |
 |------|------|
-| 🔄 自动 RSS 抓取 | 定时抓取 NodeSeek 社区 RSS，支持自定义间隔与代理 |
+| 🔄 自动 RSS 抓取 | 定时抓取 NodeSeek 社区 RSS，支持自定义间隔、代理与 Playwright 兜底 |
 | 🎯 智能关键词匹配 | 多关键词组合 + 正则表达式，按创建者/分类过滤 |
 | 📱 多通道通知 | Telegram、Server酱、MeoW 推送，支持独立开关与测试发送 |
 | 🌐 Web 控制台 | RESTful API + 可视化管理界面 |
@@ -86,8 +86,12 @@ bun test             # 运行测试
 | `CORS_ORIGINS` | `http://localhost:3010` | 允许的跨域源 |
 | `RSS_CHECK_ENABLED` | `true` | 是否启用定时抓取 |
 | `RSS_TIMEOUT` | `10000` | RSS 请求超时（ms） |
+| `RSS_PLAYWRIGHT_FALLBACK` | `true` | 普通 RSS 抓取失败时，是否启用 Playwright 浏览器兜底 |
+| `PLAYWRIGHT_HEADLESS` | `true` | Playwright 是否以无头模式运行 |
 
 > **RSS 源地址、抓取间隔、代理** 等配置已迁移到数据库，可在 Web 控制台 → **基础设置** 中动态修改。
+
+当 RSS 源出现 TLS、反爬、连接中断等问题时，服务会在普通 `fetch` 抓取失败后自动尝试 Playwright 浏览器兜底，以提高抓取成功率。
 
 ## 🔧 初始化配置
 
@@ -172,7 +176,7 @@ src/
 | Telegram Bot 无响应 | 检查 Token、Chat ID，并发送 `/start` 绑定 |
 | Server酱 测试失败 | 检查 UID、SendKey 是否正确 |
 | MeoW 测试失败 | 检查昵称、接口地址是否正确可达 |
-| RSS 抓取失败 | 检查网络 / RSS 源可用性 / 代理设置 |
+| RSS 抓取失败 | 检查网络 / RSS 源可用性 / 代理设置 / Playwright 浏览器依赖是否完整 |
 | RSS 配置不生效 | 修改间隔后点击 **重启任务** |
 
 ```bash

@@ -5,6 +5,22 @@ WORKDIR /usr/src/app
 # 安装系统依赖（用于健康检查）
 RUN apt-get update && apt-get install -y \
     curl \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libatspi2.0-0 \
+    libxshmfence1 \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装依赖阶段
@@ -12,11 +28,13 @@ FROM base AS install
 RUN mkdir -p /temp/dev
 COPY package.json bun.lock bun.lockb* /temp/dev/
 RUN cd /temp/dev && bun install --frozen-lockfile
+RUN cd /temp/dev && bunx playwright install chromium
 
 # 如果有生产依赖，可以单独安装
 RUN mkdir -p /temp/prod
 COPY package.json bun.lock bun.lockb* /temp/prod/
 RUN cd /temp/prod && bun install --frozen-lockfile --production
+RUN cd /temp/prod && bunx playwright install chromium
 
 # 预发布阶段 - 复制源代码并构建
 FROM base AS prerelease
