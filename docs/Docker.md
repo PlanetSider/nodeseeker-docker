@@ -1,22 +1,19 @@
 # NodeSeeker Docker 部署指南
 
-本项目当前提供两种 Docker 部署方式：
+当前仓库只保留一套 Compose 部署文件：
 
-1. 使用仓库内的 `Dockerfile` 本地构建镜像
-2. 直接拉取 GHCR 已发布镜像运行
+1. `docker-compose.yml`
+
+它直接拉取 GHCR 镜像运行，并把运行参数写在文件内，不再依赖 `.env` 文件。
 
 ## 文件说明
 
 1. `Dockerfile`
-   用于构建应用镜像，基于 Bun 运行时，并内置 Playwright Chromium 依赖。
+   用于构建项目镜像，CI 会基于它发布 GHCR 镜像。
 2. `docker-compose.yml`
-   适合本地开发、测试或自建环境，直接从当前仓库构建镜像。
-3. `docker-compose.prod.yml`
-   适合生产环境，默认拉取 `ghcr.io/planetsider/nodeseeker-docker:latest`。
-4. `.dockerignore`
+   唯一保留的 Compose 文件，直接使用 `ghcr.io/planetsider/nodeseeker-docker:latest`。
+3. `.dockerignore`
    Docker 构建上下文忽略规则。
-5. `.env.example`
-   环境变量模板。
 
 ## 快速开始
 
@@ -28,150 +25,127 @@ docker run -d \
   -p 3010:3010 \
   -v ./data:/usr/src/app/data \
   -v ./logs:/usr/src/app/logs \
-  --env-file .env \
+  -e NODE_ENV=production \
+  -e PORT=3010 \
+  -e HOST=0.0.0.0 \
+  -e DATABASE_PATH=/usr/src/app/data/nodeseeker.db \
+  -e CORS_ORIGINS=http://localhost:3010 \
+  -e RSS_TIMEOUT=10000 \
+  -e RSS_CHECK_ENABLED=true \
+  -e RSS_PLAYWRIGHT_FALLBACK=true \
+  -e PLAYWRIGHT_HEADLESS=true \
+  -e TELEGRAM_WEBHOOK_URL= \
+  -e LOG_LEVEL=info \
   ghcr.io/planetsider/nodeseeker-docker:latest
 ```
 
-访问 `http://localhost:3010`，首次使用时创建管理员账户。
-
-### 方式二：使用本地 Compose 构建运行
+### 方式二：使用 Docker Compose
 
 ```bash
-cp .env.example .env
-docker compose up -d --build
+docker compose up -d
 ```
 
 这会：
 
-1. 根据当前仓库 `Dockerfile` 构建镜像
+1. 拉取最新 GHCR 镜像
 2. 启动应用容器
 3. 挂载本地 `./data` 和 `./logs`
 
-### 方式三：生产环境 Compose
+## 当前 Compose 配置特征
 
-```bash
-cp .env.example .env
-docker compose -f docker-compose.prod.yml up -d
-```
+`docker-compose.yml` 当前是简化后的单服务配置，特点如下：
 
-这会直接拉取：
+1. 不再依赖 `.env`
+2. 不再区分 `prod` 文件名
+3. 不再包含 `watchtower`
+4. 不再配置容器健康检查
+5. 所有基础运行参数直接写在 `environment` 中
 
-```text
-ghcr.io/planetsider/nodeseeker-docker:latest
-```
+## 当前内置环境参数
 
-## 环境变量
+`docker-compose.yml` 直接写入了这些参数：
 
-项目支持零配置启动，但建议通过 `.env` 显式管理运行参数。
-
-当前仍由环境变量控制的主要项目：
-
-| 变量 | 默认值 | 说明 |
+| 变量 | 当前值 | 说明 |
 |------|--------|------|
+| `NODE_ENV` | `production` | 生产模式 |
 | `PORT` | `3010` | 服务端口 |
-| `HOST` | `0.0.0.0` | 服务监听地址 |
+| `HOST` | `0.0.0.0` | 监听地址 |
+| `DATABASE_PATH` | `/usr/src/app/data/nodeseeker.db` | SQLite 路径 |
 | `CORS_ORIGINS` | `http://localhost:3010` | 允许的跨域源 |
 | `RSS_TIMEOUT` | `10000` | RSS 请求超时 |
-| `RSS_CHECK_ENABLED` | `true` | 是否启用定时 RSS 抓取 |
-| `RSS_PLAYWRIGHT_FALLBACK` | `true` | 普通 RSS 抓取失败时是否启用 Playwright 兜底 |
-| `PLAYWRIGHT_HEADLESS` | `true` | Playwright 是否使用无头模式 |
-| `TELEGRAM_WEBHOOK_URL` | 空 | 可选覆盖 Telegram Webhook URL |
+| `RSS_CHECK_ENABLED` | `true` | 是否启用定时抓取 |
+| `RSS_PLAYWRIGHT_FALLBACK` | `true` | RSS 抓取失败时启用 Playwright 兜底 |
+| `PLAYWRIGHT_HEADLESS` | `true` | Playwright 无头模式 |
+| `TELEGRAM_WEBHOOK_URL` | 空字符串 | 可选覆盖 Webhook URL |
 | `LOG_LEVEL` | `info` | 日志级别 |
 
-以下业务配置已经迁移到数据库和 Web 管理界面：
+如果你要修改部署参数，直接编辑：
 
-1. RSS 源地址
-2. RSS 抓取间隔
-3. RSS 代理
-4. Telegram Bot Token
-5. Telegram Chat ID
-6. Server酱 配置
-7. MeoW 配置
+1. `docker-compose.yml`
 
 ## 数据与日志目录
 
-Compose 文件默认使用以下宿主机目录挂载：
+Compose 默认挂载：
 
 1. `./data` -> `/usr/src/app/data`
 2. `./logs` -> `/usr/src/app/logs`
 
-这样更适合：
-
-1. 直接备份 SQLite 数据库
-2. 检查运行日志
-3. 在本机和服务器上保持一致的目录结构
+建议你在部署目录下提前创建这两个目录。
 
 ## Playwright 兜底说明
 
-镜像中已包含 Playwright Chromium 所需依赖，用于 RSS 抓取兜底。
+镜像中已经包含 Playwright Chromium 所需依赖。
 
-工作方式：
+当普通 RSS 抓取失败时，服务会自动尝试：
 
-1. 默认先使用普通 `fetch` 抓取 RSS
-2. 如果出现 TLS、反爬、连接中断等问题
-3. 自动回退到 Playwright 浏览器抓取
+1. 启动 Playwright Chromium
+2. 使用浏览器方式访问 RSS 地址
+3. 再按原有 XML 解析逻辑处理结果
 
-如果你不希望启用兜底，可在 `.env` 中设置：
+如果你不希望启用兜底，直接把 `docker-compose.yml` 中的：
 
-```bash
-RSS_PLAYWRIGHT_FALLBACK=false
+```yaml
+RSS_PLAYWRIGHT_FALLBACK: true
+```
+
+改成：
+
+```yaml
+RSS_PLAYWRIGHT_FALLBACK: false
 ```
 
 ## 常用命令
 
-### 查看服务状态
+### 启动
+
+```bash
+docker compose up -d
+```
+
+### 拉取最新镜像并重建容器
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### 查看状态
 
 ```bash
 docker compose ps
-docker compose -f docker-compose.prod.yml ps
 ```
 
 ### 查看日志
 
 ```bash
 docker compose logs -f nodeseeker
-docker compose -f docker-compose.prod.yml logs -f nodeseeker
 ```
 
 ### 停止服务
 
 ```bash
 docker compose down
-docker compose -f docker-compose.prod.yml down
 ```
-
-### 重新构建本地镜像
-
-```bash
-docker compose up -d --build
-```
-
-### 拉取最新生产镜像
-
-```bash
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
-```
-
-## 健康检查
-
-镜像内置健康检查：
-
-```text
-GET /health
-```
-
-你也可以手动检查：
-
-```bash
-curl http://localhost:3010/health
-```
-
-## 自动更新
-
-`docker-compose.prod.yml` 默认带有 `watchtower` 服务，可用于自动更新生产镜像。
-
-如果你不需要自动更新，可以直接删掉或注释掉 `watchtower` 服务。
 
 ## 故障排除
 
@@ -185,17 +159,17 @@ docker compose logs nodeseeker
 
 1. `./data` 目录是否可写
 2. 端口 `3010` 是否被占用
-3. `.env` 配置是否有非法值
+3. `docker-compose.yml` 中的参数是否写错
 
 ### 2. RSS 抓取失败
 
-先检查：
+重点检查：
 
 1. RSS 源是否可访问
 2. 网络或代理是否异常
-3. Playwright fallback 是否已启用
+3. Playwright fallback 是否启用
 
-### 3. 生产环境拉不到镜像
+### 3. 拉不到镜像
 
 确认以下镜像是否存在：
 
@@ -203,21 +177,11 @@ docker compose logs nodeseeker
 ghcr.io/planetsider/nodeseeker-docker:latest
 ```
 
-如果仓库是私有或访问受限，需要先登录 GHCR。
-
-### 4. 数据迁移问题
-
-数据库文件挂载在：
-
-```text
-/usr/src/app/data/nodeseeker.db
-```
-
-升级镜像前建议先备份 `./data` 目录。
+如果镜像不可见，先确认 GitHub Actions 是否已经成功发布镜像。
 
 ## 备份建议
 
-最直接的备份方式是备份宿主机目录：
+直接备份宿主机目录即可：
 
 1. `./data`
 2. `./logs`

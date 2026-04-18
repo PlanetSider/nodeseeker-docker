@@ -30,7 +30,17 @@ docker run -d \
   -p 3010:3010 \
   -v ./data:/usr/src/app/data \
   -v ./logs:/usr/src/app/logs \
-  --env-file .env \
+  -e NODE_ENV=production \
+  -e PORT=3010 \
+  -e HOST=0.0.0.0 \
+  -e DATABASE_PATH=/usr/src/app/data/nodeseeker.db \
+  -e CORS_ORIGINS=http://localhost:3010 \
+  -e RSS_TIMEOUT=10000 \
+  -e RSS_CHECK_ENABLED=true \
+  -e RSS_PLAYWRIGHT_FALLBACK=true \
+  -e PLAYWRIGHT_HEADLESS=true \
+  -e TELEGRAM_WEBHOOK_URL= \
+  -e LOG_LEVEL=info \
   ghcr.io/planetsider/nodeseeker-docker:latest
 ```
 
@@ -42,32 +52,17 @@ docker run -d \
 git clone https://github.com/PlanetSider/nodeseeker-docker.git
 cd nodeseeker-docker
 
-# （推荐）复制环境变量模板
-cp .env.example .env
-
-# 使用本地 Dockerfile 构建并启动
-docker compose up -d --build
+# 直接拉取并启动镜像
+docker compose up -d
 ```
 
-> `docker-compose.yml` 适合本地直接构建运行；`docker-compose.prod.yml` 默认使用 GHCR 中已发布的镜像，适合服务器部署。
-
-### 生产环境 Compose
-
-```bash
-# 拉取最新镜像并启动
-docker compose -f docker-compose.prod.yml up -d
-```
-
-生产环境默认镜像：`ghcr.io/planetsider/nodeseeker-docker:latest`
+默认镜像：`ghcr.io/planetsider/nodeseeker-docker:latest`
 
 ### 本地开发
 
 ```bash
 # 安装依赖（需要 Bun 1.0+）
 bun install
-
-# 配置环境变量
-cp .env.example .env
 
 # 启动开发服务器（热重载）
 bun run dev
@@ -88,7 +83,7 @@ bun test             # 运行测试
 
 ## ⚙️ 配置
 
-无需任何环境变量即可运行，**开箱即用**。可选配置见 [.env.example](.env.example)：
+默认 `docker-compose.yml` 已经把运行参数直接写在文件里，开箱即用。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -99,28 +94,23 @@ bun test             # 运行测试
 | `RSS_TIMEOUT` | `10000` | RSS 请求超时（ms） |
 | `RSS_PLAYWRIGHT_FALLBACK` | `true` | 普通 RSS 抓取失败时，是否启用 Playwright 浏览器兜底 |
 | `PLAYWRIGHT_HEADLESS` | `true` | Playwright 是否以无头模式运行 |
+| `LOG_LEVEL` | `info` | 日志级别 |
 
 > **RSS 源地址、抓取间隔、代理** 等配置已迁移到数据库，可在 Web 控制台 → **基础设置** 中动态修改。
 
 当 RSS 源出现 TLS、反爬、连接中断等问题时，服务会在普通 `fetch` 抓取失败后自动尝试 Playwright 浏览器兜底，以提高抓取成功率。
 
-Docker Compose 中仍建议保留 `.env`，用于控制服务端口、CORS、RSS 超时、Playwright fallback、Webhook 覆盖等基础运行参数。
-
 ## 🐳 部署说明
 
-当前仓库中的 Compose 文件职责如下：
+当前仓库只保留一个 Compose 文件：`docker-compose.yml`
 
-1. `docker-compose.yml`
-   适合本地或测试环境，直接使用仓库里的 `Dockerfile` 构建镜像。
-2. `docker-compose.prod.yml`
-   适合生产环境，直接拉取 `ghcr.io/planetsider/nodeseeker-docker:latest`。
+它会：
 
-两个文件都会：
-
-1. 读取项目根目录下的 `.env`
-2. 挂载 `./data` 到容器数据库目录
-3. 挂载 `./logs` 到容器日志目录
-4. 暴露 `3010` 端口
+1. 直接拉取 `ghcr.io/planetsider/nodeseeker-docker:latest`
+2. 将运行参数直接写在 `environment` 中
+3. 挂载 `./data` 到容器数据库目录
+4. 挂载 `./logs` 到容器日志目录
+5. 暴露 `3010` 端口
 
 ## 🔧 初始化配置
 
@@ -200,7 +190,7 @@ src/
 
 | 问题 | 解决方案 |
 |------|----------|
-| 端口冲突 | 修改 `.env` 中的 `PORT` |
+| 端口冲突 | 修改 `docker-compose.yml` 中的 `PORT` 和端口映射 |
 | 数据库权限 | 确保 `data/` 目录有写权限 |
 | Telegram Bot 无响应 | 检查 Token、Chat ID，并发送 `/start` 绑定 |
 | Server酱 测试失败 | 检查 UID、SendKey 是否正确 |
@@ -210,8 +200,7 @@ src/
 
 ```bash
 # 诊断命令
-docker-compose logs nodeseeker    # 查看日志
-curl http://localhost:3010/health # 健康检查
+docker compose logs nodeseeker    # 查看日志
 ```
 
 ## 📚 更多文档

@@ -1,36 +1,28 @@
 services:
   nodeseeker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/planetsider/nodeseeker-docker:latest
+    pull_policy: always
     container_name: nodeseeker-app
     restart: unless-stopped
-    env_file:
-      - .env
     ports:
       - "3010:3010"
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${PORT:-3010}
-      HOST: ${HOST:-0.0.0.0}
+      NODE_ENV: production
+      PORT: 3010
+      HOST: 0.0.0.0
       DATABASE_PATH: /usr/src/app/data/nodeseeker.db
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3010}
-      RSS_TIMEOUT: ${RSS_TIMEOUT:-10000}
-      RSS_CHECK_ENABLED: ${RSS_CHECK_ENABLED:-true}
-      RSS_PLAYWRIGHT_FALLBACK: ${RSS_PLAYWRIGHT_FALLBACK:-true}
-      PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}
-      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+      CORS_ORIGINS: http://localhost:3010
+      RSS_TIMEOUT: 10000
+      RSS_CHECK_ENABLED: true
+      RSS_PLAYWRIGHT_FALLBACK: true
+      PLAYWRIGHT_HEADLESS: true
+      TELEGRAM_WEBHOOK_URL: ""
+      LOG_LEVEL: info
     volumes:
       - ./data:/usr/src/app/data
       - ./logs:/usr/src/app/logs
     networks:
       - nodeseeker_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3010/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     logging:
       driver: "json-file"
       options:
