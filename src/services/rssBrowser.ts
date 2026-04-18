@@ -20,17 +20,23 @@ export class RSSBrowserService {
         this.headless = config.PLAYWRIGHT_HEADLESS;
     }
 
-    async fetchRSSContent(url: string): Promise<string> {
+    async fetchRSSContent(url: string, cookie?: string): Promise<string> {
         const { chromium } = await this.loadPlaywright();
         const browser = await chromium.launch({
             headless: this.headless,
         });
 
         try {
-            const page = await browser.newPage({
+            const context = await browser.newContext({
                 userAgent:
                     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
             });
+            if (cookie?.trim()) {
+                await context.setExtraHTTPHeaders({
+                    Cookie: cookie.trim(),
+                });
+            }
+            const page = await context.newPage();
 
             await page.goto(url, {
                 waitUntil: 'networkidle',

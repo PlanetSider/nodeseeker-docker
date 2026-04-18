@@ -44,6 +44,8 @@ export const baseConfigUpdateSchema = z.object({
     rss_url: z.string().url('RSS URL格式不正确').optional(),
     rss_interval_seconds: z.number().int().min(10).max(3600).optional(),
     rss_proxy: z.string().optional(),
+    rss_cookie: z.string().optional(),
+    rss_cookie_expired_notified: z.union([z.number().int().min(0).max(1), z.boolean().transform(val => val ? 1 : 0)]).optional(),
 });
 
 // 文章验证 Schema

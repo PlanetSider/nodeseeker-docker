@@ -93,9 +93,9 @@ export class DatabaseService {
       INSERT INTO base_config (
         username, password, bot_token, chat_id, bound_user_name, bound_user_username,
         stop_push, only_title, serverchan_enabled, serverchan_uid, serverchan_sendkey,
-        meow_enabled, meow_endpoint, meow_nickname, meow_token, rss_url, rss_interval_seconds, rss_proxy
+        meow_enabled, meow_endpoint, meow_nickname, meow_token, rss_url, rss_interval_seconds, rss_proxy, rss_cookie, rss_cookie_expired_notified
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `);
     
@@ -117,7 +117,9 @@ export class DatabaseService {
       config.meow_token || null,
       config.rss_url || 'https://rss.nodeseek.com/',
       config.rss_interval_seconds || 60,
-      config.rss_proxy || null
+      config.rss_proxy || null,
+      config.rss_cookie || null,
+      config.rss_cookie_expired_notified || 0
     ) as BaseConfig;
     
     // 清理相关缓存
@@ -249,6 +251,14 @@ export class DatabaseService {
     if (config.rss_proxy !== undefined) {
       updates.push('rss_proxy = ?');
       values.push(config.rss_proxy);
+    }
+    if (config.rss_cookie !== undefined) {
+      updates.push('rss_cookie = ?');
+      values.push(config.rss_cookie);
+    }
+    if (config.rss_cookie_expired_notified !== undefined) {
+      updates.push('rss_cookie_expired_notified = ?');
+      values.push(config.rss_cookie_expired_notified);
     }
     if (config.telegram_mode !== undefined) {
       updates.push('telegram_mode = ?');

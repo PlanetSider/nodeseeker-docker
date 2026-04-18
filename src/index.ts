@@ -463,7 +463,7 @@ async function setupDefaultRssConfig() {
     
     if (config) {
       // 如果数据库中没有 RSS 配置，则设置默认值
-      const updates: { rss_url?: string; rss_interval_seconds?: number; rss_proxy?: string } = {};
+      const updates: { rss_url?: string; rss_interval_seconds?: number; rss_proxy?: string; rss_cookie?: string; rss_cookie_expired_notified?: number } = {};
       
       if (!config.rss_url) {
         updates.rss_url = DEFAULT_RSS_CONFIG.url;
@@ -478,6 +478,14 @@ async function setupDefaultRssConfig() {
       if (config.rss_proxy === undefined) {
         updates.rss_proxy = DEFAULT_RSS_CONFIG.proxy || '';
         logger.rss(`设置默认 RSS 代理: ${updates.rss_proxy || '无'}`);
+      }
+
+      if (config.rss_cookie === undefined) {
+        updates.rss_cookie = '';
+      }
+
+      if (config.rss_cookie_expired_notified === undefined) {
+        updates.rss_cookie_expired_notified = 0;
       }
       
       if (Object.keys(updates).length > 0) {

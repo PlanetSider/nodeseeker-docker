@@ -31,6 +31,8 @@ export interface BaseConfig {
   rss_url?: string;
   rss_interval_seconds?: number;
   rss_proxy?: string;
+  rss_cookie?: string;
+  rss_cookie_expired_notified?: number;
   telegram_mode?: string; // 'disabled' | 'webhook' | 'polling'
   created_at?: string;
   updated_at?: string;

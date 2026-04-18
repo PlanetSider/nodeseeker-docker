@@ -800,6 +800,7 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("rssUrl").value = result.data.rss_url || "";
       document.getElementById("rssInterval").value = result.data.rss_interval_seconds || 60;
       document.getElementById("rssProxy").value = result.data.rss_proxy || "";
+      document.getElementById("rssCookie").value = result.data.rss_cookie || "";
     }
   }
 
@@ -812,6 +813,7 @@ document.addEventListener("DOMContentLoaded", function () {
         rss_url: document.getElementById("rssUrl").value.trim(),
         rss_interval_seconds: parseInt(document.getElementById("rssInterval").value, 10),
         rss_proxy: document.getElementById("rssProxy").value.trim(),
+        rss_cookie: document.getElementById("rssCookie").value.trim(),
       };
 
       const result = await apiRequest("/api/rss/config", {

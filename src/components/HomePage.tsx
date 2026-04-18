@@ -280,6 +280,11 @@ export const HomePage: FC = () => {
               <input type="text" id="rssProxy" class="input-field" placeholder="http://127.0.0.1:7890" />
               <span class="form-hint">HTTP/HTTPS 代理，留空则不使用代理</span>
             </div>
+            <div class="form-group">
+              <label for="rssCookie" class="form-label">抓取 Cookie（可选）</label>
+              <textarea id="rssCookie" class="input-field" rows={5} placeholder="填写用于抓取 NodeSeek 的 Cookie"></textarea>
+              <span class="form-hint">配置后，RSS 抓取和 Playwright 兜底都会自动带上该 Cookie。Cookie 疑似过期时会通过已启用通知通道发送告警。</span>
+            </div>
             <div class="form-actions">
               <button type="button" id="testRssBtn" class="btn btn-secondary">
                 测试连接

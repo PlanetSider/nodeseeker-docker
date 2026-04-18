@@ -649,6 +649,7 @@ apiRoutes.get('/rss/config', async (c) => {
             rss_url: config.rss_url || 'https://rss.nodeseek.com/',
             rss_interval_seconds: config.rss_interval_seconds || 60,
             rss_proxy: config.rss_proxy || '',
+            rss_cookie: config.rss_cookie || '',
         }));
     } catch (error) {
         return c.json(createErrorResponse(`获取 RSS 配置失败: ${error}`), 500);
@@ -660,10 +661,15 @@ apiRoutes.put('/rss/config', createValidationMiddleware(z.object({
     rss_url: z.string().url().optional(),
     rss_interval_seconds: z.number().int().min(10).max(3600).optional(),
     rss_proxy: z.string().optional(),
+    rss_cookie: z.string().optional(),
 })), async (c) => {
     try {
         const validatedData = c.get('validatedData');
         const dbService = c.get('dbService');
+
+        if (validatedData.rss_cookie !== undefined) {
+            validatedData.rss_cookie_expired_notified = 0;
+        }
 
         // 更新数据库配置
         const config = dbService.updateBaseConfig(validatedData);
@@ -676,6 +682,7 @@ apiRoutes.put('/rss/config', createValidationMiddleware(z.object({
             rss_url: config.rss_url,
             rss_interval_seconds: config.rss_interval_seconds,
             rss_proxy: config.rss_proxy,
+            rss_cookie: config.rss_cookie,
         }, 'RSS 配置更新成功'));
     } catch (error) {
         return c.json(createErrorResponse(`更新 RSS 配置失败: ${error}`), 500);

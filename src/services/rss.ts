@@ -3,6 +3,9 @@ import { getEnvConfig } from "../config/env";
 import { logger } from "../utils/logger";
 import type { Post, RSSItem, ParsedPost, RSSProcessResult } from "../types";
 import { RSSBrowserService } from "./rssBrowser";
+import { TelegramPushService } from "./telegram/push";
+import { ServerChanService } from "./notification/serverchan";
+import { MeowService } from "./notification/meow";
 
 export class RSSService {
   private readonly TIMEOUT: number;
@@ -16,9 +19,9 @@ export class RSSService {
     this.rssBrowserService = new RSSBrowserService();
   }
 
-  private async fetchWithPlaywright(url: string): Promise<RSSItem[]> {
+  private async fetchWithPlaywright(url: string, cookie?: string): Promise<RSSItem[]> {
     logger.rss(`普通抓取失败，尝试 Playwright 兜底: ${url}`);
-    const xmlText = await this.rssBrowserService.fetchRSSContent(url);
+    const xmlText = await this.rssBrowserService.fetchRSSContent(url, cookie);
     return this.parseRSSXML(xmlText);
   }
 
@@ -33,12 +36,60 @@ export class RSSService {
   /**
    * 获取 RSS 配置（从数据库）
    */
-  private getRSSConfig(): { url: string; intervalSeconds: number } {
+  private getRSSConfig(): { url: string; intervalSeconds: number; cookie?: string } {
     const config = this.dbService.getBaseConfig();
     return {
       url: config?.rss_url || "https://rss.nodeseek.com/",
       intervalSeconds: config?.rss_interval_seconds || 60,
+      cookie: config?.rss_cookie || undefined,
     };
+  }
+
+  private isCookieExpiredResponse(status: number, responseText: string): boolean {
+    if (status === 401 || status === 403) {
+      return true;
+    }
+
+    const lowered = responseText.toLowerCase();
+    return (
+      lowered.includes('登录') ||
+      lowered.includes('登陆') ||
+      lowered.includes('cookie') ||
+      lowered.includes('unauthorized') ||
+      lowered.includes('forbidden')
+    ) && !lowered.includes('<rss');
+  }
+
+  private async notifyCookieExpired(): Promise<void> {
+    const config = this.dbService.getBaseConfig();
+    if (!config?.rss_cookie?.trim() || config.rss_cookie_expired_notified === 1) {
+      return;
+    }
+
+    const title = 'NodeSeeker RSS Cookie 已过期';
+    const message = '⚠️ NodeSeeker RSS 抓取检测到 Cookie 可能已失效，请在 RSS 设置中更新 Cookie。';
+    let notified = false;
+
+    if (config.bot_token && config.chat_id && config.stop_push !== 1) {
+      const telegramService = new TelegramPushService(this.dbService, config.bot_token);
+      notified = await telegramService.testSendMessage(config.chat_id, message) || notified;
+    }
+
+    if (config.serverchan_enabled === 1) {
+      const serverChanService = new ServerChanService(this.dbService);
+      const result = await serverChanService.sendMessage(title, message);
+      notified = result.success || notified;
+    }
+
+    if (config.meow_enabled === 1) {
+      const meowService = new MeowService(this.dbService);
+      const result = await meowService.sendMessage(title, message);
+      notified = result.success || notified;
+    }
+
+    this.dbService.updateBaseConfig({
+      rss_cookie_expired_notified: notified ? 1 : 0,
+    });
   }
 
   /**
@@ -159,6 +210,13 @@ export class RSSService {
         },
       };
 
+      if (rssConfig.cookie?.trim()) {
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          Cookie: rssConfig.cookie.trim(),
+        };
+      }
+
       // 如果配置了代理，添加代理选项
       if (proxy) {
         fetchOptions.proxy = proxy;
@@ -176,6 +234,15 @@ export class RSSService {
       }
 
       const xmlText = await response.text();
+
+      if (rssConfig.cookie?.trim() && this.isCookieExpiredResponse(response.status, xmlText)) {
+        await this.notifyCookieExpired();
+        throw new Error('RSS Cookie 可能已过期');
+      }
+
+      if (rssConfig.cookie?.trim()) {
+        this.dbService.updateBaseConfig({ rss_cookie_expired_notified: 0 });
+      }
 
       const items = this.parseRSSXML(xmlText);
 
@@ -214,7 +281,7 @@ export class RSSService {
       if (this.PLAYWRIGHT_FALLBACK) {
         try {
           const rssConfig = this.getRSSConfig();
-          return await this.fetchWithPlaywright(rssConfig.url);
+          return await this.fetchWithPlaywright(rssConfig.url, rssConfig.cookie);
         } catch (playwrightError) {
           logger.error('Playwright RSS 兜底失败:', playwrightError);
           throw new Error(`RSS 抓取失败: ${errorMessage}；Playwright 兜底也失败: ${playwrightError}`);

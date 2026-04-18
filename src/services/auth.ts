@@ -125,6 +125,7 @@ export class AuthService {
         only_title: 0,
         serverchan_enabled: 0,
         meow_enabled: 0,
+        rss_cookie_expired_notified: 0,
       });
 
       // 创建session
