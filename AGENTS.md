@@ -98,12 +98,12 @@ src/
 
 ## Environment Variables
 
-Key variables in `.env`:
+Key runtime variables:
 - `PORT=3010` - Server port
 - `HOST=0.0.0.0` - Bind address
 - `DATABASE_PATH=./data/nodeseeker.db` - SQLite location
-- `RSS_URL=https://rss.nodeseek.com/` - RSS source
-- `TELEGRAM_BOT_TOKEN` - Optional bot token
+- `RSS_TIMEOUT=10000` - RSS request timeout
+- `RSS_PLAYWRIGHT_FALLBACK=true` - Enable Playwright RSS fallback
 - `LOG_LEVEL=info` - Logging verbosity
 
 ## Development Workflow

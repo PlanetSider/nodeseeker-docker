@@ -7,16 +7,37 @@ services:
     ports:
       - "3010:3010"
     environment:
+      # 运行环境，固定为 production
       NODE_ENV: production
+
+      # Web 服务监听端口
       PORT: 3010
+
+      # Web 服务监听地址
       HOST: 0.0.0.0
+
+      # SQLite 数据库文件在容器内的保存位置
       DATABASE_PATH: /usr/src/app/data/nodeseeker.db
+
+      # 允许访问 API 的来源地址
       CORS_ORIGINS: http://localhost:3010
+
+      # RSS 抓取请求超时时间，单位毫秒
       RSS_TIMEOUT: 10000
+
+      # 是否启用定时 RSS 抓取任务
       RSS_CHECK_ENABLED: true
+
+      # 普通 RSS 抓取失败时，是否启用 Playwright 浏览器兜底
       RSS_PLAYWRIGHT_FALLBACK: true
+
+      # Playwright 是否使用无头模式运行
       PLAYWRIGHT_HEADLESS: true
-      TELEGRAM_WEBHOOK_URL: ""
+
+      # 可选的 Telegram Webhook 覆盖地址，留空表示不强制指定
+      TELEGRAM_WEBHOOK_URL:
+
+      # 日志级别，可选 info / debug / warn / error
       LOG_LEVEL: info
     volumes:
       - ./data:/usr/src/app/data
