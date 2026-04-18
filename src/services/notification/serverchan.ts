@@ -64,6 +64,7 @@ export class ServerChanService {
                 body: JSON.stringify({
                     title,
                     desp,
+                    tags: 'NodeSeek',
                 }),
             });
 
