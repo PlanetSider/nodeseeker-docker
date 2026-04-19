@@ -8,6 +8,82 @@ export class AISummaryService {
         return AISummaryService.DEFAULT_PROMPT;
     }
 
+    private extractText(value: unknown): string | undefined {
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            return trimmed || undefined;
+        }
+
+        if (Array.isArray(value)) {
+            const combined = value
+                .map((item) => this.extractText(item))
+                .filter((item): item is string => !!item)
+                .join('\n')
+                .trim();
+
+            return combined || undefined;
+        }
+
+        if (!value || typeof value !== 'object') {
+            return undefined;
+        }
+
+        const record = value as Record<string, unknown>;
+
+        const directCandidates = [
+            record.text,
+            record.output_text,
+            record.content,
+            record.message,
+            record.response,
+        ];
+
+        for (const candidate of directCandidates) {
+            const extracted = this.extractText(candidate);
+            if (extracted) {
+                return extracted;
+            }
+        }
+
+        if (Array.isArray(record.choices)) {
+            for (const choice of record.choices) {
+                const extracted = this.extractText(choice);
+                if (extracted) {
+                    return extracted;
+                }
+            }
+        }
+
+        if (Array.isArray(record.output)) {
+            for (const output of record.output) {
+                const extracted = this.extractText(output);
+                if (extracted) {
+                    return extracted;
+                }
+            }
+        }
+
+        if (Array.isArray(record.data)) {
+            for (const dataItem of record.data) {
+                const extracted = this.extractText(dataItem);
+                if (extracted) {
+                    return extracted;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    private extractSummaryFromResponse(result: unknown): string | undefined {
+        const summary = this.extractText(result);
+        if (!summary) {
+            return undefined;
+        }
+
+        return summary.slice(0, 1000);
+    }
+
     isEnabled(config: BaseConfig | null): boolean {
         return !!(
             config &&
@@ -36,6 +112,7 @@ export class AISummaryService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    Accept: 'application/json',
                     Authorization: `Bearer ${config.ai_api_key!.trim()}`,
                 },
                 body: JSON.stringify({
@@ -45,6 +122,7 @@ export class AISummaryService {
                         { role: 'user', content },
                     ],
                     temperature: 0.3,
+                    stream: false,
                 }),
             });
 
@@ -53,20 +131,14 @@ export class AISummaryService {
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 
-            const result = await response.json() as {
-                choices?: Array<{
-                    message?: {
-                        content?: string;
-                    };
-                }>;
-            };
-
-            const summary = result.choices?.[0]?.message?.content?.trim();
+            const result = await response.json();
+            const summary = this.extractSummaryFromResponse(result);
             if (!summary) {
+                logger.warn('AI 接口返回了无法识别的响应结构:', JSON.stringify(result).slice(0, 1000));
                 return undefined;
             }
 
-            return summary.slice(0, 1000);
+            return summary;
         } catch (error) {
             logger.error('AI 总结生成失败:', error);
             return undefined;
