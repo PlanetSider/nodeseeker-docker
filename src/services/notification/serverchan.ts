@@ -98,7 +98,7 @@ export class ServerChanService {
         }
 
         const message = buildNotificationMessage(post, matchedSub);
-        const result = await this.sendMessage(message.title, message.markdown);
+        const result = await this.sendMessage(message.title, message.richText);
         return result.success;
     }
 

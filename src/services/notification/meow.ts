@@ -103,7 +103,7 @@ export class MeowService {
         }
 
         const message = buildNotificationMessage(post, matchedSub);
-        const result = await this.sendMessage(message.title, message.markdown, message.postUrl);
+        const result = await this.sendMessage(message.title, message.richText, message.postUrl);
         return result.success;
     }
 
