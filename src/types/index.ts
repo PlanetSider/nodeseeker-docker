@@ -33,6 +33,11 @@ export interface BaseConfig {
   rss_proxy?: string;
   rss_cookie?: string;
   rss_cookie_expired_notified?: number;
+  ai_enabled?: number;
+  ai_api_url?: string;
+  ai_api_key?: string;
+  ai_model?: string;
+  ai_prompt?: string;
   telegram_mode?: string; // 'disabled' | 'webhook' | 'polling'
   created_at?: string;
   updated_at?: string;
@@ -45,6 +50,9 @@ export interface Post {
   post_id: number;
   title: string;
   memo: string;
+  source_url?: string;
+  article_body?: string;
+  ai_summary?: string;
   category: string;
   creator: string;
   push_status: number; // 0=待处理, 1=已匹配但未推送, 2=未匹配, 3=已匹配且已推送成功
@@ -83,6 +91,9 @@ export interface ParsedPost {
   post_id: number;
   title: string;
   memo: string;
+  source_url: string;
+  article_body?: string;
+  ai_summary?: string;
   category: string;
   creator: string;
   pub_date: string;

@@ -6,17 +6,111 @@ import { RSSBrowserService } from "./rssBrowser";
 import { TelegramPushService } from "./telegram/push";
 import { ServerChanService } from "./notification/serverchan";
 import { MeowService } from "./notification/meow";
+import { AISummaryService } from './aiSummary';
 
 export class RSSService {
   private readonly TIMEOUT: number;
   private readonly PLAYWRIGHT_FALLBACK: boolean;
   private readonly rssBrowserService: RSSBrowserService;
+  private readonly aiSummaryService: AISummaryService;
 
   constructor(private dbService: DatabaseService) {
     const config = getEnvConfig();
     this.TIMEOUT = config.RSS_TIMEOUT;
     this.PLAYWRIGHT_FALLBACK = config.RSS_PLAYWRIGHT_FALLBACK;
     this.rssBrowserService = new RSSBrowserService();
+    this.aiSummaryService = new AISummaryService();
+  }
+
+  private decodeHtmlEntities(text: string): string {
+    return text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+
+  private normalizeText(text: string): string {
+    return this.decodeHtmlEntities(text)
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\r/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  }
+
+  private extractArticleBodyFromHtml(html: string): string {
+    const selectors = [
+      /<article[^>]*>([\s\S]*?)<\/article>/i,
+      /<div[^>]*class=["'][^"']*(?:topic-body|post-body|message|content|cooked)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+      /<main[^>]*>([\s\S]*?)<\/main>/i,
+      /<body[^>]*>([\s\S]*?)<\/body>/i,
+    ];
+
+    for (const pattern of selectors) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        const normalized = this.normalizeText(match[1]);
+        if (normalized.length >= 80) {
+          return normalized;
+        }
+      }
+    }
+
+    return this.normalizeText(html);
+  }
+
+  private async fetchArticleBody(url: string, cookie?: string): Promise<string | undefined> {
+    try {
+      const proxy = this.getProxy();
+      const headers: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      };
+
+      if (cookie?.trim()) {
+        headers.Cookie = cookie.trim();
+      }
+
+      const fetchOptions: RequestInit & { proxy?: string } = {
+        headers,
+      };
+
+      if (proxy) {
+        fetchOptions.proxy = proxy;
+      }
+
+      const response = await fetch(url, fetchOptions);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const html = await response.text();
+      const articleBody = this.extractArticleBodyFromHtml(html);
+      if (articleBody.length >= 80) {
+        return articleBody.slice(0, 20000);
+      }
+    } catch (error) {
+      logger.warn(`正文普通抓取失败，尝试 Playwright: ${url}`);
+    }
+
+    try {
+      const html = await this.rssBrowserService.fetchPageContent(url, cookie);
+      const articleBody = this.extractArticleBodyFromHtml(html);
+      if (articleBody.length >= 80) {
+        return articleBody.slice(0, 20000);
+      }
+    } catch (error) {
+      logger.error('正文抓取失败:', error);
+    }
+
+    return undefined;
   }
 
   private async fetchWithPlaywright(url: string, cookie?: string): Promise<RSSItem[]> {
@@ -332,8 +426,7 @@ export class RSSService {
 
     // 清洗内容摘要
     let memo = item.contentSnippet || item.content || "";
-    memo = memo.replace(/<[^>]*>/g, ""); // 移除 HTML 标签
-    memo = memo.trim().replace(/\s+/g, " ");
+    memo = this.normalizeText(memo).replace(/\s+/g, " ");
     memo = memo.substring(0, 500); // 限制长度
 
     // 清洗分类
@@ -359,6 +452,7 @@ export class RSSService {
       post_id: postId,
       title,
       memo,
+      source_url: item.link,
       category,
       creator,
       pub_date: pubDate,
@@ -381,6 +475,9 @@ export class RSSService {
         let processed = 0;
         let newPosts = 0;
         let errors = 0;
+
+        const rssConfig = this.getRSSConfig();
+        const baseConfig = this.dbService.getBaseConfig();
 
         // 第一步：批量解析所有RSS项目
         const parsedPosts: ParsedPost[] = [];
@@ -409,6 +506,21 @@ export class RSSService {
 
         // 第三步：筛选出需要创建的新文章
         const newPostsToCreate = parsedPosts.filter((parsedPost) => !existingPosts.has(parsedPost.post_id));
+
+        for (const post of newPostsToCreate) {
+          try {
+            const articleBody = await this.fetchArticleBody(post.source_url, rssConfig.cookie);
+            if (articleBody) {
+              post.article_body = articleBody;
+              post.memo = articleBody.slice(0, 500);
+              if (baseConfig) {
+                post.ai_summary = await this.aiSummaryService.summarize(baseConfig, post.title, articleBody);
+              }
+            }
+          } catch (error) {
+            logger.error(`补充正文或AI摘要失败 (post_id: ${post.post_id}):`, error);
+          }
+        }
 
         // 第四步：批量创建新文章
         if (newPostsToCreate.length > 0) {

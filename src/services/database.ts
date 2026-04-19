@@ -93,9 +93,10 @@ export class DatabaseService {
       INSERT INTO base_config (
         username, password, bot_token, chat_id, bound_user_name, bound_user_username,
         stop_push, only_title, serverchan_enabled, serverchan_uid, serverchan_sendkey,
-        meow_enabled, meow_endpoint, meow_nickname, meow_token, rss_url, rss_interval_seconds, rss_proxy, rss_cookie, rss_cookie_expired_notified
+        meow_enabled, meow_endpoint, meow_nickname, meow_token, rss_url, rss_interval_seconds, rss_proxy, rss_cookie, rss_cookie_expired_notified,
+        ai_enabled, ai_api_url, ai_api_key, ai_model, ai_prompt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `);
     
@@ -119,7 +120,12 @@ export class DatabaseService {
       config.rss_interval_seconds || 60,
       config.rss_proxy || null,
       config.rss_cookie || null,
-      config.rss_cookie_expired_notified || 0
+      config.rss_cookie_expired_notified || 0,
+      config.ai_enabled || 0,
+      config.ai_api_url || null,
+      config.ai_api_key || null,
+      config.ai_model || null,
+      config.ai_prompt || null
     ) as BaseConfig;
     
     // 清理相关缓存
@@ -260,6 +266,26 @@ export class DatabaseService {
       updates.push('rss_cookie_expired_notified = ?');
       values.push(config.rss_cookie_expired_notified);
     }
+    if (config.ai_enabled !== undefined) {
+      updates.push('ai_enabled = ?');
+      values.push(config.ai_enabled);
+    }
+    if (config.ai_api_url !== undefined) {
+      updates.push('ai_api_url = ?');
+      values.push(config.ai_api_url);
+    }
+    if (config.ai_api_key !== undefined) {
+      updates.push('ai_api_key = ?');
+      values.push(config.ai_api_key);
+    }
+    if (config.ai_model !== undefined) {
+      updates.push('ai_model = ?');
+      values.push(config.ai_model);
+    }
+    if (config.ai_prompt !== undefined) {
+      updates.push('ai_prompt = ?');
+      values.push(config.ai_prompt);
+    }
     if (config.telegram_mode !== undefined) {
       updates.push('telegram_mode = ?');
       values.push(config.telegram_mode);
@@ -289,8 +315,8 @@ export class DatabaseService {
   // 文章相关操作
   createPost(post: Omit<Post, 'id' | 'created_at'>): Post {
     const stmt = this.db.query(`
-      INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO posts (post_id, title, memo, source_url, article_body, ai_summary, category, creator, push_status, sub_id, pub_date, push_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `);
 
@@ -298,6 +324,9 @@ export class DatabaseService {
       post.post_id,
       post.title,
       post.memo,
+      post.source_url || null,
+      post.article_body || null,
+      post.ai_summary || null,
       post.category,
       post.creator,
       post.push_status,
@@ -322,8 +351,8 @@ export class DatabaseService {
     }
 
     const stmt = this.db.query(`
-      INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO posts (post_id, title, memo, source_url, article_body, ai_summary, category, creator, push_status, sub_id, pub_date, push_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // 使用事务进行批量插入
@@ -335,6 +364,9 @@ export class DatabaseService {
             post.post_id,
             post.title,
             post.memo,
+            post.source_url || null,
+            post.article_body || null,
+            post.ai_summary || null,
             post.category,
             post.creator,
             post.push_status,

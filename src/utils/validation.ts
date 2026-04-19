@@ -46,6 +46,11 @@ export const baseConfigUpdateSchema = z.object({
     rss_proxy: z.string().optional(),
     rss_cookie: z.string().optional(),
     rss_cookie_expired_notified: z.union([z.number().int().min(0).max(1), z.boolean().transform(val => val ? 1 : 0)]).optional(),
+    ai_enabled: z.union([z.number().int().min(0).max(1), z.boolean().transform(val => val ? 1 : 0)]).optional(),
+    ai_api_url: z.string().url('AI API URL格式不正确').optional(),
+    ai_api_key: z.string().optional(),
+    ai_model: z.string().max(100).optional(),
+    ai_prompt: z.string().max(2000).optional(),
 });
 
 // 文章验证 Schema
@@ -53,6 +58,9 @@ export const postSchema = z.object({
     post_id: z.number().int().positive('文章ID必须是正整数'),
     title: z.string().min(1, '标题不能为空').max(500, '标题不能超过500个字符'),
     memo: z.string().max(2000, '摘要不能超过2000个字符').default(''),
+    source_url: z.string().url('来源链接格式不正确').optional(),
+    article_body: z.string().max(50000, '正文不能超过50000个字符').optional(),
+    ai_summary: z.string().max(5000, 'AI摘要不能超过5000个字符').optional(),
     category: z.string().min(1, '分类不能为空').max(100, '分类不能超过100个字符'),
     creator: z.string().min(1, '创建者不能为空').max(100, '创建者不能超过100个字符'),
     push_status: z.number().int().min(0).max(3).default(0),

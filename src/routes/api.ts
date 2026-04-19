@@ -8,6 +8,7 @@ import { TelegramPushService } from '../services/telegram/push';
 import { MeowService } from '../services/notification/meow';
 import { ServerChanService } from '../services/notification/serverchan';
 import { MatcherService } from '../services/matcher';
+import { AISummaryService } from '../services/aiSummary';
 import { createValidationMiddleware, createQueryValidationMiddleware, createParamValidationMiddleware } from '../utils/validation';
 import { createSuccessResponse, createErrorResponse } from '../utils/helpers';
 import {
@@ -633,6 +634,52 @@ apiRoutes.post('/notifications/meow/test', createValidationMiddleware(z.object({
     }
 });
 
+apiRoutes.post('/rss/test-ai-summary', createValidationMiddleware(z.object({
+    ai_enabled: z.union([z.number().int().min(0).max(1), z.boolean().transform(val => val ? 1 : 0)]).optional(),
+    ai_api_url: z.string().url().optional(),
+    ai_api_key: z.string().optional(),
+    ai_model: z.string().max(100).optional(),
+    ai_prompt: z.string().max(2000).optional(),
+    title: z.string().min(1).max(200).optional(),
+    article_body: z.string().min(20).max(20000).optional(),
+})), async (c) => {
+    try {
+        const validatedData = c.get('validatedData');
+        const dbService = c.get('dbService');
+        const config = dbService.getBaseConfig();
+        const aiSummaryService = new AISummaryService();
+
+        const mergedConfig = {
+            ...(config || {}),
+            ai_enabled: validatedData.ai_enabled ?? config?.ai_enabled ?? 0,
+            ai_api_url: validatedData.ai_api_url ?? config?.ai_api_url ?? '',
+            ai_api_key: validatedData.ai_api_key ?? config?.ai_api_key ?? '',
+            ai_model: validatedData.ai_model ?? config?.ai_model ?? '',
+            ai_prompt: validatedData.ai_prompt ?? config?.ai_prompt ?? aiSummaryService.getDefaultPrompt(),
+        };
+
+        if (!aiSummaryService.isEnabled(mergedConfig)) {
+            return c.json(createErrorResponse('AI 功能未启用或配置不完整，请检查 AI URL、API Key 和模型名称'), 400);
+        }
+
+        const title = validatedData.title || 'NodeSeek 测试帖子';
+        const articleBody = validatedData.article_body || '这是一段用于测试 AI 总结功能的示例正文。假设帖子内容介绍了某个新服务的价格、使用条件、限制、风险和推荐人群，希望 AI 能提炼出重点，方便通过通知渠道快速阅读。';
+        const summary = await aiSummaryService.summarize(mergedConfig, title, articleBody);
+
+        if (!summary) {
+            return c.json(createErrorResponse('AI 已返回空内容，请检查模型能力、提示词或接口兼容性'), 400);
+        }
+
+        return c.json(createSuccessResponse({
+            title,
+            article_body: articleBody,
+            summary,
+        }, 'AI 总结测试成功'));
+    } catch (error) {
+        return c.json(createErrorResponse(`AI 总结测试失败: ${error}`), 500);
+    }
+});
+
 // ==================== RSS 配置接口 ====================
 
 // 获取 RSS 配置
@@ -650,6 +697,11 @@ apiRoutes.get('/rss/config', async (c) => {
             rss_interval_seconds: config.rss_interval_seconds || 60,
             rss_proxy: config.rss_proxy || '',
             rss_cookie: config.rss_cookie || '',
+            ai_enabled: config.ai_enabled || 0,
+            ai_api_url: config.ai_api_url || '',
+            ai_api_key: config.ai_api_key || '',
+            ai_model: config.ai_model || '',
+            ai_prompt: config.ai_prompt || '',
         }));
     } catch (error) {
         return c.json(createErrorResponse(`获取 RSS 配置失败: ${error}`), 500);
@@ -662,6 +714,11 @@ apiRoutes.put('/rss/config', createValidationMiddleware(z.object({
     rss_interval_seconds: z.number().int().min(10).max(3600).optional(),
     rss_proxy: z.string().optional(),
     rss_cookie: z.string().optional(),
+    ai_enabled: z.union([z.number().int().min(0).max(1), z.boolean().transform(val => val ? 1 : 0)]).optional(),
+    ai_api_url: z.string().url().optional(),
+    ai_api_key: z.string().optional(),
+    ai_model: z.string().max(100).optional(),
+    ai_prompt: z.string().max(2000).optional(),
 })), async (c) => {
     try {
         const validatedData = c.get('validatedData');
@@ -683,6 +740,11 @@ apiRoutes.put('/rss/config', createValidationMiddleware(z.object({
             rss_interval_seconds: config.rss_interval_seconds,
             rss_proxy: config.rss_proxy,
             rss_cookie: config.rss_cookie,
+            ai_enabled: config.ai_enabled,
+            ai_api_url: config.ai_api_url,
+            ai_api_key: config.ai_api_key,
+            ai_model: config.ai_model,
+            ai_prompt: config.ai_prompt,
         }, 'RSS 配置更新成功'));
     } catch (error) {
         return c.json(createErrorResponse(`更新 RSS 配置失败: ${error}`), 500);

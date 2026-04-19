@@ -45,11 +45,13 @@ export function buildNotificationMessage(post: Post, matchedSub: KeywordSub): No
     const metaLine = [keywordsStr, creator, category].filter(Boolean).join(' ');
     const postUrl = `https://www.nodeseek.com/post-${post.post_id}-1`;
     const sanitizedTitle = sanitizeMarkdownTitle(post.title);
+    const summary = (post.ai_summary || post.memo || '').trim();
+    const summaryBlock = summary ? `\n\n${summary}` : '';
 
     return {
         title: sanitizedTitle,
-        markdown: `**${metaLine}**\n\n**[${sanitizedTitle}](${postUrl})**`,
-        plainText: `${metaLine}\n\n${sanitizedTitle}\n${postUrl}`.trim(),
+        markdown: `**${metaLine}**\n\n**[${sanitizedTitle}](${postUrl})**${summaryBlock}`,
+        plainText: `${metaLine}\n\n${sanitizedTitle}\n${summary}\n${postUrl}`.trim(),
         postUrl,
     };
 }

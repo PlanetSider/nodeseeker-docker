@@ -285,9 +285,38 @@ export const HomePage: FC = () => {
               <textarea id="rssCookie" class="input-field" rows={5} placeholder="填写用于抓取 NodeSeek 的 Cookie"></textarea>
               <span class="form-hint">配置后，RSS 抓取和 Playwright 兜底都会自动带上该 Cookie。Cookie 疑似过期时会通过已启用通知通道发送告警。</span>
             </div>
+            <div class="form-group">
+              <div class="checkbox-wrapper">
+                <input type="checkbox" id="aiEnabled" />
+                <div class="checkbox-content">
+                  <div class="checkbox-label">启用 AI 总结</div>
+                  <div class="checkbox-description">抓取文章正文后，调用兼容 OpenAI Chat Completions 的接口生成摘要，并附加到通知内容</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="aiApiUrl" class="form-label">AI API URL</label>
+              <input type="url" id="aiApiUrl" class="input-field" placeholder="https://your-api.example.com/v1/chat/completions" />
+            </div>
+            <div class="form-group">
+              <label for="aiApiKey" class="form-label">AI API Key</label>
+              <input type="password" id="aiApiKey" class="input-field" placeholder="sk-..." />
+            </div>
+            <div class="form-group">
+              <label for="aiModel" class="form-label">AI 模型</label>
+              <input type="text" id="aiModel" class="input-field" placeholder="gpt-4o-mini" />
+            </div>
+            <div class="form-group">
+              <label for="aiPrompt" class="form-label">总结提示词（可选）</label>
+              <textarea id="aiPrompt" class="input-field" rows={4} placeholder="留空则使用默认中文总结提示词"></textarea>
+              <span class="form-hint">需要兼容 OpenAI 的 `/v1/chat/completions` 响应格式。</span>
+            </div>
             <div class="form-actions">
               <button type="button" id="testRssBtn" class="btn btn-secondary">
                 测试连接
+              </button>
+              <button type="button" id="testAiBtn" class="btn btn-secondary">
+                测试 AI 总结
               </button>
               <button type="submit" class="btn btn-primary">
                 保存配置

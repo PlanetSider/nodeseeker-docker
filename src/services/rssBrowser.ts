@@ -20,7 +20,7 @@ export class RSSBrowserService {
         this.headless = config.PLAYWRIGHT_HEADLESS;
     }
 
-    async fetchRSSContent(url: string, cookie?: string): Promise<string> {
+    private async openPage(url: string, cookie?: string): Promise<{ contentType: string; content: string; bodyText: string }> {
         const { chromium } = await this.loadPlaywright();
         const browser = await chromium.launch({
             headless: this.headless,
@@ -45,12 +45,22 @@ export class RSSBrowserService {
 
             const contentType = await page.evaluate(() => document.contentType || '');
             const content = await page.content();
+            const bodyText = await page.locator('body').innerText().catch(() => '');
+
+            return { contentType, content, bodyText };
+        } finally {
+            await browser.close();
+        }
+    }
+
+    async fetchRSSContent(url: string, cookie?: string): Promise<string> {
+        try {
+            const { contentType, content, bodyText } = await this.openPage(url, cookie);
 
             if (contentType.includes('xml') || content.includes('<rss') || content.includes('<item')) {
                 return content;
             }
 
-            const bodyText = await page.locator('body').innerText().catch(() => '');
             if (bodyText.includes('<rss') || bodyText.includes('<item')) {
                 return bodyText;
             }
@@ -59,8 +69,16 @@ export class RSSBrowserService {
         } catch (error) {
             logger.error('Playwright RSS 抓取失败:', error);
             throw error;
-        } finally {
-            await browser.close();
+        }
+    }
+
+    async fetchPageContent(url: string, cookie?: string): Promise<string> {
+        try {
+            const { content } = await this.openPage(url, cookie);
+            return content;
+        } catch (error) {
+            logger.error('Playwright 页面抓取失败:', error);
+            throw error;
         }
     }
 }

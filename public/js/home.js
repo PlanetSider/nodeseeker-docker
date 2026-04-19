@@ -801,6 +801,11 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("rssInterval").value = result.data.rss_interval_seconds || 60;
       document.getElementById("rssProxy").value = result.data.rss_proxy || "";
       document.getElementById("rssCookie").value = result.data.rss_cookie || "";
+      document.getElementById("aiEnabled").checked = result.data.ai_enabled === 1;
+      document.getElementById("aiApiUrl").value = result.data.ai_api_url || "";
+      document.getElementById("aiApiKey").value = result.data.ai_api_key || "";
+      document.getElementById("aiModel").value = result.data.ai_model || "";
+      document.getElementById("aiPrompt").value = result.data.ai_prompt || "";
     }
   }
 
@@ -814,6 +819,11 @@ document.addEventListener("DOMContentLoaded", function () {
         rss_interval_seconds: parseInt(document.getElementById("rssInterval").value, 10),
         rss_proxy: document.getElementById("rssProxy").value.trim(),
         rss_cookie: document.getElementById("rssCookie").value.trim(),
+        ai_enabled: document.getElementById("aiEnabled").checked ? 1 : 0,
+        ai_api_url: document.getElementById("aiApiUrl").value.trim(),
+        ai_api_key: document.getElementById("aiApiKey").value.trim(),
+        ai_model: document.getElementById("aiModel").value.trim(),
+        ai_prompt: document.getElementById("aiPrompt").value.trim(),
       };
 
       const result = await apiRequest("/api/rss/config", {
@@ -847,6 +857,30 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           Toast.error("连接失败：" + result.data.message);
         }
+      }
+    });
+
+    document.getElementById("testAiBtn")?.addEventListener("click", async () => {
+      const data = {
+        ai_enabled: document.getElementById("aiEnabled").checked ? 1 : 0,
+        ai_api_url: document.getElementById("aiApiUrl").value.trim(),
+        ai_api_key: document.getElementById("aiApiKey").value.trim(),
+        ai_model: document.getElementById("aiModel").value.trim(),
+        ai_prompt: document.getElementById("aiPrompt").value.trim(),
+      };
+
+      Toast.info("正在测试 AI 总结...");
+
+      const result = await apiRequest("/api/rss/test-ai-summary", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (result?.success) {
+        const summary = result.data?.summary || "AI 返回为空";
+        Toast.success(`AI 测试成功：${summary.length > 80 ? summary.slice(0, 80) + "..." : summary}`, 5000);
+      } else {
+        Toast.error(result?.message || "AI 测试失败", 5000);
       }
     });
   }
