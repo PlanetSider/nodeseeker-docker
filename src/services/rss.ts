@@ -61,11 +61,32 @@ export class RSSService {
       '.topic-map',
       '.topic-footer-main-buttons',
       '.topic-navigation',
+      '.sidebar-wrapper',
+      '.navigation-container',
+      '.nav-pills',
+      '.nav-stacked',
+      '.header-sidebar-toggle',
+      '.d-header',
+      '.d-header-icons',
+      '.header-cloak',
+      '.contents .topic-avatar',
       '.post-menu-area',
       '.post-actions',
       '.embedded-posts',
       '.private-message-glyph',
       '.ad-container',
+      '.category-list',
+      '.footer-message',
+      '.footer-nav',
+      '.below-topic-list-area',
+      '.discourse-tags',
+      '.list-controls',
+      '.user-directory-link',
+      '.topic-list-footer',
+      'header',
+      'footer',
+      'nav',
+      'aside',
     ];
 
     for (const selector of hiddenSelectors) {
@@ -78,7 +99,69 @@ export class RSSService {
   private getNodeTextScore(element: Element): number {
     const text = this.normalizeText(element.textContent || '');
     const paragraphCount = element.querySelectorAll('p, blockquote, pre, li').length;
-    return text.length + paragraphCount * 80;
+    const boilerplatePenalty = this.containsBoilerplate(text) ? 5000 : 0;
+    return text.length + paragraphCount * 80 - boilerplatePenalty;
+  }
+
+  private containsBoilerplate(text: string): boolean {
+    const patterns = [
+      'NodeSeek beta',
+      'search for post',
+      'search for people',
+      'use google search',
+      '所有版块 日常 技术 情报 测评 交易 拼车 推广',
+      '发帖 快捷功能区 推荐阅读 管理记录 幸运抽奖 邀请好友',
+      '相关网站 LowEndTalk LowEndSpirit HostLoc ServerHunter',
+      '站内导航 关于本站 隐私协议 RSS订阅 sitemap',
+      'Copyright © 2022 -',
+      '目前论坛共有',
+      '欢迎新用户',
+    ];
+
+    return patterns.some((pattern) => text.includes(pattern));
+  }
+
+  private stripBoilerplate(text: string): string {
+    const lines = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const filteredLines = lines.filter((line) => {
+      const compact = line.replace(/\s+/g, ' ');
+
+      if (compact.length < 2) {
+        return false;
+      }
+
+      const blockedPatterns = [
+        /NodeSeek beta 日常 技术 情报 测评 交易 拼车 推广/i,
+        /DeepFlood search for post search for people use google search/i,
+        /所有版块 日常 技术 情报 测评 交易 拼车 推广/i,
+        /发帖 快捷功能区 推荐阅读 管理记录 幸运抽奖 邀请好友/i,
+        /合作商家 友站链接 所有版块/i,
+        /📈用户数目📈/i,
+        /目前论坛共有\d+位seeker/i,
+        /🎉欢迎新用户🎉/i,
+        /相关网站 LowEndTalk LowEndSpirit HostLoc ServerHunter/i,
+        /站内导航 关于本站 隐私协议 RSS订阅 sitemap/i,
+        /商业推广 商家申请规则 Premium Provider/i,
+        /广告合作 其他平台 电报频道 电报群组 联系我们/i,
+        /Copyright © 2022\s*-\s*20\d{2}/i,
+      ];
+
+      if (blockedPatterns.some((pattern) => pattern.test(compact))) {
+        return false;
+      }
+
+      if (/^(日常|技术|情报|测评|交易|拼车|推广|生活|Dev|贴图|曝光|内版|沙盒)(\s+(日常|技术|情报|测评|交易|拼车|推广|生活|Dev|贴图|曝光|内版|沙盒))+$/i.test(compact)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return filteredLines.join('\n');
   }
 
   private extractArticleBodyFromHtml(html: string): string {
@@ -109,8 +192,9 @@ export class RSSService {
           }
 
           const normalized = this.normalizeText(element.innerHTML || element.textContent || '');
-          if (normalized.length >= 80) {
-            bestText = normalized;
+          const cleaned = this.stripBoilerplate(normalized);
+          if (cleaned.length >= 80) {
+            bestText = cleaned;
             bestScore = score;
           }
         }
@@ -123,7 +207,7 @@ export class RSSService {
       logger.debug(`DOM 解析正文失败，将回退到纯文本清洗: ${error}`);
     }
 
-    return this.normalizeText(html);
+    return this.stripBoilerplate(this.normalizeText(html));
   }
 
   private async fetchArticleBody(url: string, cookie?: string): Promise<string | undefined> {
