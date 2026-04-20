@@ -1,6 +1,7 @@
 import { DatabaseService } from "./database";
 import { getEnvConfig } from "../config/env";
 import { logger } from "../utils/logger";
+import { parseHTML } from "linkedom";
 import type { Post, RSSItem, ParsedPost, RSSProcessResult } from "../types";
 import { RSSBrowserService } from "./rssBrowser";
 import { TelegramPushService } from "./telegram/push";
@@ -43,22 +44,83 @@ export class RSSService {
       .trim();
   }
 
-  private extractArticleBodyFromHtml(html: string): string {
-    const selectors = [
-      /<article[^>]*>([\s\S]*?)<\/article>/i,
-      /<div[^>]*class=["'][^"']*(?:topic-body|post-body|message|content|cooked)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
-      /<main[^>]*>([\s\S]*?)<\/main>/i,
-      /<body[^>]*>([\s\S]*?)<\/body>/i,
+  private removeHiddenNodes(root: ParentNode): void {
+    const hiddenSelectors = [
+      'script',
+      'style',
+      'noscript',
+      'template',
+      'svg',
+      'canvas',
+      'iframe',
+      '[aria-hidden="true"]',
+      '[hidden]',
+      '.sr-only',
+      '.visually-hidden',
+      '.crawler-link',
+      '.topic-map',
+      '.topic-footer-main-buttons',
+      '.topic-navigation',
+      '.post-menu-area',
+      '.post-actions',
+      '.embedded-posts',
+      '.private-message-glyph',
+      '.ad-container',
     ];
 
-    for (const pattern of selectors) {
-      const match = html.match(pattern);
-      if (match?.[1]) {
-        const normalized = this.normalizeText(match[1]);
-        if (normalized.length >= 80) {
-          return normalized;
+    for (const selector of hiddenSelectors) {
+      for (const element of Array.from(root.querySelectorAll(selector))) {
+        element.remove();
+      }
+    }
+  }
+
+  private getNodeTextScore(element: Element): number {
+    const text = this.normalizeText(element.textContent || '');
+    const paragraphCount = element.querySelectorAll('p, blockquote, pre, li').length;
+    return text.length + paragraphCount * 80;
+  }
+
+  private extractArticleBodyFromHtml(html: string): string {
+    try {
+      const { document } = parseHTML(html);
+      this.removeHiddenNodes(document);
+
+      const selectors = [
+        'article',
+        '.topic-body',
+        '.post-body',
+        '.cooked',
+        '.topic-post .contents',
+        '.regular.contents',
+        '.topic-area',
+        'main',
+        'body',
+      ];
+
+      let bestText = '';
+      let bestScore = 0;
+
+      for (const selector of selectors) {
+        for (const element of Array.from(document.querySelectorAll(selector))) {
+          const score = this.getNodeTextScore(element);
+          if (score <= bestScore) {
+            continue;
+          }
+
+          const normalized = this.normalizeText(element.innerHTML || element.textContent || '');
+          if (normalized.length >= 80) {
+            bestText = normalized;
+            bestScore = score;
+          }
         }
       }
+
+      if (bestText) {
+        return bestText;
+      }
+    } catch (error) {
+      logger.debug(`DOM 解析正文失败，将回退到纯文本清洗: ${error}`);
     }
 
     return this.normalizeText(html);
@@ -94,7 +156,7 @@ export class RSSService {
       const html = await response.text();
       const articleBody = this.extractArticleBodyFromHtml(html);
       if (articleBody.length >= 80) {
-        return articleBody.slice(0, 20000);
+        return articleBody;
       }
     } catch (error) {
       logger.warn(`正文普通抓取失败，尝试 Playwright: ${url}`);
@@ -104,7 +166,7 @@ export class RSSService {
       const html = await this.rssBrowserService.fetchPageContent(url, cookie);
       const articleBody = this.extractArticleBodyFromHtml(html);
       if (articleBody.length >= 80) {
-        return articleBody.slice(0, 20000);
+        return articleBody;
       }
     } catch (error) {
       logger.error('正文抓取失败:', error);

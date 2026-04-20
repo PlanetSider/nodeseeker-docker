@@ -58,6 +58,7 @@ RUN mkdir -p /usr/src/app/data /usr/src/app/logs
 
 # 复制应用文件
 COPY --from=install /temp/prod/node_modules node_modules
+COPY --from=install /root/.cache/ms-playwright /root/.cache/ms-playwright
 COPY --from=prerelease /usr/src/app/dist ./dist
 COPY --from=prerelease /usr/src/app/public ./public
 COPY --from=prerelease /usr/src/app/src/database ./src/database
