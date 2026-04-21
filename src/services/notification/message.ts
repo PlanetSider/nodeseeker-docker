@@ -57,6 +57,7 @@ export function buildNotificationMessage(post: Post, matchedSub: KeywordSub): No
     const category = matchedSub.category ? `🗂️ ${getCategoryName(matchedSub.category)}` : '';
     const metaLine = [keywordsStr, creator, category].filter(Boolean).join(' ');
     const postUrl = `https://www.nodeseek.com/post-${post.post_id}-1`;
+    const trackIdLine = `Track ID: ${post.post_id}`;
     const sanitizedTitle = sanitizeMarkdownTitle(post.title);
     const summary = getPostBody(post);
     const summaryBlock = summary ? `\n\n${summary}` : '';
@@ -65,12 +66,13 @@ export function buildNotificationMessage(post: Post, matchedSub: KeywordSub): No
         sanitizedTitle,
         summary ? truncateText(summary, 1800) : '',
         postUrl,
+        trackIdLine,
     ].filter(Boolean).join('\n\n');
 
     return {
         title: sanitizedTitle,
-        markdown: `**${metaLine}**\n\n**[${sanitizedTitle}](${postUrl})**${summaryBlock}`,
-        plainText: `${metaLine}\n\n${sanitizedTitle}\n${summary}\n${postUrl}`.trim(),
+        markdown: `**${metaLine}**\n\n**[${sanitizedTitle}](${postUrl})**${summaryBlock}\n\n${trackIdLine}`,
+        plainText: `${metaLine}\n\n${sanitizedTitle}\n${summary}\n${postUrl}\n\n${trackIdLine}`.trim(),
         richText,
         postUrl,
     };
