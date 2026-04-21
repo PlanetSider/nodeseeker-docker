@@ -28,6 +28,17 @@ export interface BaseConfig {
   meow_last_test_at?: string;
   meow_last_send_at?: string;
   meow_last_error?: string;
+  feishu_enabled?: number;
+  feishu_app_id?: string;
+  feishu_app_secret?: string;
+  feishu_verification_token?: string;
+  feishu_chat_id?: string;
+  feishu_bound_user_name?: string;
+  feishu_bound_user_id?: string;
+  feishu_last_test_status?: string;
+  feishu_last_test_at?: string;
+  feishu_last_send_at?: string;
+  feishu_last_error?: string;
   rss_url?: string;
   rss_interval_seconds?: number;
   rss_proxy?: string;

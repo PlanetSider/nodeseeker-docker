@@ -47,6 +47,9 @@ export const HomePage: FC = () => {
                 <button class="dropdown-item" data-drawer="telegram">
                   <span>🤖</span> Telegram
                 </button>
+                <button class="dropdown-item" data-drawer="feishu">
+                  <span>🪶</span> 飞书
+                </button>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item text-danger" id="logoutBtn">
                   <span>🚪</span> 退出登录
@@ -327,6 +330,87 @@ export const HomePage: FC = () => {
             <button id="fetchRssBtn" class="btn btn-primary" style="width: 100%;">
               立即抓取 RSS
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 飞书配置抽屉 */}
+      <div id="feishuDrawer" class="drawer" style="display: none;">
+        <div class="drawer-header">
+          <h3 class="drawer-title">飞书配置</h3>
+          <button class="drawer-close" data-drawer="feishu">
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+        <div class="drawer-content">
+          <div class="form-card">
+            <h4 class="form-section-title">🪶 命令通道总览</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <strong>飞书状态:</strong> <span id="overviewFeishuStatus">-</span>
+              </div>
+              <div class="info-item">
+                <strong>飞书配置:</strong> <span id="overviewFeishuConfigStatus">-</span>
+              </div>
+              <div class="info-item">
+                <strong>飞书绑定:</strong> <span id="overviewFeishuBindingStatus">-</span>
+              </div>
+              <div class="info-item">
+                <strong>飞书最近测试:</strong> <span id="overviewFeishuLastTest">-</span>
+              </div>
+              <div class="info-item">
+                <strong>飞书最近发送:</strong> <span id="overviewFeishuLastSend">-</span>
+              </div>
+              <div class="info-item" style={{ gridColumn: "1 / -1" }}>
+                <strong>飞书最近错误:</strong> <span id="overviewFeishuLastError">-</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-card" style={{ marginTop: "24px" }}>
+            <h4 class="form-section-title">⚙️ 飞书应用配置</h4>
+            <form id="feishuConfigForm" class="form-stack">
+              <div class="form-group">
+                <div class="checkbox-wrapper">
+                  <input type="checkbox" id="feishuEnabled" />
+                  <div class="checkbox-content">
+                    <div class="checkbox-label">启用飞书命令通道</div>
+                    <div class="checkbox-description">飞书只接收命令，不直接接收 RSS 推送通知</div>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="feishuAppId" class="form-label">App ID</label>
+                <input type="text" id="feishuAppId" class="input-field" placeholder="cli_xxx" />
+              </div>
+              <div class="form-group">
+                <label for="feishuAppSecret" class="form-label">App Secret</label>
+                <input type="password" id="feishuAppSecret" class="input-field" placeholder="应用密钥" />
+              </div>
+              <div class="form-group">
+                <label for="feishuVerificationToken" class="form-label">Verification Token</label>
+                <input type="text" id="feishuVerificationToken" class="input-field" placeholder="事件订阅验证 Token" />
+              </div>
+              <div class="form-group">
+                <label for="feishuWebhookUrl" class="form-label">Webhook 地址</label>
+                <input type="text" id="feishuWebhookUrl" class="input-field" readonly value="/feishu/webhook" />
+                <span class="form-hint">在飞书事件订阅中配置该回调地址，文本消息命令会通过此地址进入系统。</span>
+              </div>
+              <div class="form-group">
+                <label for="feishuBoundChatId" class="form-label">已绑定会话</label>
+                <input type="text" id="feishuBoundChatId" class="input-field" readonly placeholder="发送 /start 后自动绑定" />
+              </div>
+              <div class="form-actions">
+                <button type="button" id="testFeishuBtn" class="btn btn-secondary">
+                  测试连接
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  保存配置
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>

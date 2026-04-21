@@ -93,10 +93,12 @@ export class DatabaseService {
       INSERT INTO base_config (
         username, password, bot_token, chat_id, bound_user_name, bound_user_username,
         stop_push, only_title, serverchan_enabled, serverchan_uid, serverchan_sendkey,
-        meow_enabled, meow_endpoint, meow_nickname, meow_token, rss_url, rss_interval_seconds, rss_proxy, rss_cookie, rss_cookie_expired_notified,
+        meow_enabled, meow_endpoint, meow_nickname, meow_token,
+        feishu_enabled, feishu_app_id, feishu_app_secret, feishu_verification_token, feishu_chat_id, feishu_bound_user_name, feishu_bound_user_id,
+        rss_url, rss_interval_seconds, rss_proxy, rss_cookie, rss_cookie_expired_notified,
         ai_enabled, ai_api_url, ai_api_key, ai_model, ai_prompt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `);
     
@@ -116,6 +118,13 @@ export class DatabaseService {
       config.meow_endpoint || null,
       config.meow_nickname || null,
       config.meow_token || null,
+      config.feishu_enabled || 0,
+      config.feishu_app_id || null,
+      config.feishu_app_secret || null,
+      config.feishu_verification_token || null,
+      config.feishu_chat_id || null,
+      config.feishu_bound_user_name || null,
+      config.feishu_bound_user_id || null,
       config.rss_url || 'https://rss.nodeseek.com/',
       config.rss_interval_seconds || 60,
       config.rss_proxy || null,
@@ -197,6 +206,50 @@ export class DatabaseService {
     if (config.meow_token !== undefined) {
       updates.push('meow_token = ?');
       values.push(config.meow_token);
+    }
+    if (config.feishu_enabled !== undefined) {
+      updates.push('feishu_enabled = ?');
+      values.push(config.feishu_enabled);
+    }
+    if (config.feishu_app_id !== undefined) {
+      updates.push('feishu_app_id = ?');
+      values.push(config.feishu_app_id);
+    }
+    if (config.feishu_app_secret !== undefined) {
+      updates.push('feishu_app_secret = ?');
+      values.push(config.feishu_app_secret);
+    }
+    if (config.feishu_verification_token !== undefined) {
+      updates.push('feishu_verification_token = ?');
+      values.push(config.feishu_verification_token);
+    }
+    if (config.feishu_chat_id !== undefined) {
+      updates.push('feishu_chat_id = ?');
+      values.push(config.feishu_chat_id);
+    }
+    if (config.feishu_bound_user_name !== undefined) {
+      updates.push('feishu_bound_user_name = ?');
+      values.push(config.feishu_bound_user_name);
+    }
+    if (config.feishu_bound_user_id !== undefined) {
+      updates.push('feishu_bound_user_id = ?');
+      values.push(config.feishu_bound_user_id);
+    }
+    if (config.feishu_last_test_status !== undefined) {
+      updates.push('feishu_last_test_status = ?');
+      values.push(config.feishu_last_test_status);
+    }
+    if (config.feishu_last_test_at !== undefined) {
+      updates.push('feishu_last_test_at = ?');
+      values.push(config.feishu_last_test_at);
+    }
+    if (config.feishu_last_send_at !== undefined) {
+      updates.push('feishu_last_send_at = ?');
+      values.push(config.feishu_last_send_at);
+    }
+    if (config.feishu_last_error !== undefined) {
+      updates.push('feishu_last_error = ?');
+      values.push(config.feishu_last_error);
     }
     if (config.telegram_last_test_status !== undefined) {
       updates.push('telegram_last_test_status = ?');

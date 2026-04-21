@@ -30,7 +30,7 @@ export class DatabaseMigrator {
       `).all().map((row: any) => row.filename);
 
       // 读取迁移文件
-      const migrationFiles = ['001_initial.sql', '002_add_rss_config.sql', '003_add_telegram_mode.sql', '004_add_notification_channels.sql', '005_add_meow_nickname.sql', '006_add_notification_health_fields.sql', '007_add_rss_cookie.sql', '008_add_ai_summary_fields.sql', '009_add_tracked_topics.sql'];
+      const migrationFiles = ['001_initial.sql', '002_add_rss_config.sql', '003_add_telegram_mode.sql', '004_add_notification_channels.sql', '005_add_meow_nickname.sql', '006_add_notification_health_fields.sql', '007_add_rss_cookie.sql', '008_add_ai_summary_fields.sql', '009_add_tracked_topics.sql', '010_add_feishu_command_fields.sql'];
 
       for (const filename of migrationFiles) {
         if (executedMigrations.includes(filename)) {

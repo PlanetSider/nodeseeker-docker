@@ -1,0 +1,11 @@
+ALTER TABLE base_config ADD COLUMN feishu_enabled INTEGER DEFAULT 0;
+ALTER TABLE base_config ADD COLUMN feishu_app_id TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_app_secret TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_verification_token TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_chat_id TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_bound_user_name TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_bound_user_id TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_last_test_status TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_last_test_at TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_last_send_at TEXT;
+ALTER TABLE base_config ADD COLUMN feishu_last_error TEXT;

@@ -15,6 +15,7 @@ import { apiRoutes } from './routes/api';
 import { telegramRoutes } from './routes/telegram';
 import { telegramPushRoutes } from './routes/telegramPush';
 import { telegramWebhookRoutes } from './routes/telegramWebhook';
+import { feishuRoutes } from './routes/feishu';
 import { pageRoutes } from './routes/pages';
 
 // 类型定义
@@ -428,6 +429,7 @@ app.post('/api/scheduler/rss/run', async (c) => {
 app.route('/auth', authRoutes);
 app.route('/api', apiRoutes);
 app.route('/telegram', telegramRoutes);
+app.route('/feishu', feishuRoutes);
 app.route('/api/push', telegramPushRoutes);
 app.route('/api/webhook', telegramWebhookRoutes);
 app.route('/', pageRoutes);

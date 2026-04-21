@@ -933,10 +933,19 @@ document.addEventListener("DOMContentLoaded", function () {
     const overviewMeowLastTest = document.getElementById("overviewMeowLastTest");
     const overviewMeowLastSend = document.getElementById("overviewMeowLastSend");
     const overviewMeowLastError = document.getElementById("overviewMeowLastError");
+    const overviewFeishuStatus = document.getElementById("overviewFeishuStatus");
+    const overviewFeishuConfigStatus = document.getElementById("overviewFeishuConfigStatus");
+    const overviewFeishuBindingStatus = document.getElementById("overviewFeishuBindingStatus");
+    const overviewFeishuLastTest = document.getElementById("overviewFeishuLastTest");
+    const overviewFeishuLastSend = document.getElementById("overviewFeishuLastSend");
+    const overviewFeishuLastError = document.getElementById("overviewFeishuLastError");
     const serverchanStatus = document.getElementById("serverchanStatus");
     const serverchanConfigStatus = document.getElementById("serverchanConfigStatus");
     const meowStatus = document.getElementById("meowStatus");
     const meowConfigStatus = document.getElementById("meowConfigStatus");
+    const feishuEnabled = config.feishu_enabled === 1;
+    const feishuConfigured = !!(config.feishu_app_id && config.feishu_app_id.trim() && config.feishu_app_secret && config.feishu_app_secret.trim());
+    const feishuBound = !!(config.feishu_chat_id && config.feishu_chat_id.trim());
 
     if (overviewTelegramStatus) {
       overviewTelegramStatus.textContent = telegramEnabled ? "✅ 已启用" : "⏸️ 已暂停";
@@ -983,6 +992,24 @@ document.addEventListener("DOMContentLoaded", function () {
     if (overviewMeowLastError) {
       overviewMeowLastError.textContent = config.meow_last_error || "-";
     }
+    if (overviewFeishuStatus) {
+      overviewFeishuStatus.textContent = feishuEnabled ? "✅ 已启用" : "⏸️ 已关闭";
+    }
+    if (overviewFeishuConfigStatus) {
+      overviewFeishuConfigStatus.textContent = feishuConfigured ? "✅ 完整" : "❌ 缺少 App ID 或 Secret";
+    }
+    if (overviewFeishuBindingStatus) {
+      overviewFeishuBindingStatus.textContent = feishuBound ? `✅ 已绑定 (${config.feishu_bound_user_name || config.feishu_chat_id})` : "❌ 未绑定";
+    }
+    if (overviewFeishuLastTest) {
+      overviewFeishuLastTest.textContent = `${formatTestStatus(config.feishu_last_test_status)} ${config.feishu_last_test_at ? `(${formatDateTime(config.feishu_last_test_at)})` : ""}`.trim();
+    }
+    if (overviewFeishuLastSend) {
+      overviewFeishuLastSend.textContent = formatDateTime(config.feishu_last_send_at);
+    }
+    if (overviewFeishuLastError) {
+      overviewFeishuLastError.textContent = config.feishu_last_error || "-";
+    }
 
     if (serverchanStatus) {
       serverchanStatus.textContent = serverchanEnabled ? "✅ 已启用" : "⏸️ 已关闭";
@@ -1010,6 +1037,35 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("meowEndpoint").value = config.meow_endpoint || "";
     document.getElementById("meowNickname").value = config.meow_nickname || "";
     updateNotificationStatus(config);
+  }
+
+  function applyFeishuConfig(config) {
+    document.getElementById("feishuEnabled").checked = config.feishu_enabled === 1;
+    document.getElementById("feishuAppId").value = config.feishu_app_id || "";
+    document.getElementById("feishuAppSecret").value = config.feishu_app_secret || "";
+    document.getElementById("feishuVerificationToken").value = config.feishu_verification_token || "";
+    document.getElementById("feishuBoundChatId").value = config.feishu_chat_id || "";
+
+    const webhookInput = document.getElementById("feishuWebhookUrl");
+    if (webhookInput) {
+      const origin = window.location.origin;
+      webhookInput.value = `${origin}/feishu/webhook`;
+    }
+
+    updateNotificationStatus(config);
+  }
+
+  async function loadFeishuConfig() {
+    const result = await apiRequest("/feishu/status");
+    const configResult = await apiRequest("/api/config");
+
+    if (configResult?.success) {
+      applyFeishuConfig(configResult.data);
+    }
+
+    if (result?.success && configResult?.success) {
+      updateNotificationStatus({ ...configResult.data, ...result.data.config });
+    }
   }
 
   async function loadTelegramInteractionStatus() {
@@ -1280,6 +1336,45 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  function initFeishuConfig() {
+    document.getElementById("feishuConfigForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const data = {
+        feishu_enabled: document.getElementById("feishuEnabled").checked,
+        feishu_app_id: document.getElementById("feishuAppId").value.trim(),
+        feishu_app_secret: document.getElementById("feishuAppSecret").value.trim(),
+        feishu_verification_token: document.getElementById("feishuVerificationToken").value.trim(),
+      };
+
+      const result = await apiRequest("/feishu/setup", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      if (result?.success) {
+        Toast.success("飞书配置已保存");
+        const configResult = await apiRequest("/api/config");
+        if (configResult?.success) {
+          applyFeishuConfig(configResult.data);
+        }
+      } else {
+        Toast.error(result?.message || "保存飞书配置失败");
+      }
+    });
+
+    document.getElementById("testFeishuBtn")?.addEventListener("click", async () => {
+      Toast.info("正在测试飞书连接...");
+      const result = await apiRequest("/feishu/test-connection", { method: "POST" });
+      if (result?.success) {
+        Toast.success("飞书连接测试成功");
+        await loadFeishuConfig();
+      } else {
+        Toast.error(result?.message || "飞书连接测试失败");
+      }
+    });
+  }
+
   // ============================================
   // 筛选面板订阅下拉框
   // ============================================
@@ -1515,6 +1610,8 @@ document.addEventListener("DOMContentLoaded", function () {
           loadRssConfig();
         } else if (drawerName === "telegram") {
           loadTelegramConfig();
+        } else if (drawerName === "feishu") {
+          loadFeishuConfig();
         } else if (drawerName === "stats") {
           loadChartData(currentChartDays);
         }
@@ -1676,6 +1773,7 @@ document.addEventListener("DOMContentLoaded", function () {
     initFilters();
     initRssConfig();
     initTelegramConfig();
+    initFeishuConfig();
     initSubscriptions();
     initSettingsDropdown();
     initLoginModal();
