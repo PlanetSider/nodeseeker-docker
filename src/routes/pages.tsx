@@ -58,7 +58,7 @@ pageRoutes.get('/rss.xml', async (c) => {
     const dbService = c.get('dbService');
     const exportService = new RSSExportService(dbService);
     const url = new URL(c.req.url);
-    const feedUrl = `${url.origin}/rss.xml`;
+    const feedUrl = `${url.origin}/rss.rss`;
     const xml = exportService.buildFullFeed(feedUrl, url.origin);
     return c.body(xml, 200, {
       'Content-Type': 'application/rss+xml; charset=UTF-8',
@@ -74,7 +74,7 @@ const handleSubscriptionFeed = async (c: any) => {
     const dbService = c.get('dbService');
     const exportService = new RSSExportService(dbService);
     const url = new URL(c.req.url);
-    const feedUrl = `${url.origin}/sub.xml`;
+    const feedUrl = `${url.origin}/sub.rss`;
     const xml = exportService.buildSubscriptionFeed(feedUrl, url.origin);
 
     return c.body(xml, 200, {
@@ -86,5 +86,22 @@ const handleSubscriptionFeed = async (c: any) => {
   }
 };
 
+pageRoutes.get('/rss.rss', async (c) => {
+  try {
+    const dbService = c.get('dbService');
+    const exportService = new RSSExportService(dbService);
+    const url = new URL(c.req.url);
+    const feedUrl = `${url.origin}/rss.rss`;
+    const xml = exportService.buildFullFeed(feedUrl, url.origin);
+    return c.body(xml, 200, {
+      'Content-Type': 'application/rss+xml; charset=UTF-8',
+      'Cache-Control': 'public, max-age=300',
+    });
+  } catch (error) {
+    return c.html(<ErrorPage message={`生成全量 RSS 失败: ${error}`} />);
+  }
+});
+
 pageRoutes.get('/sub', handleSubscriptionFeed);
 pageRoutes.get('/sub.xml', handleSubscriptionFeed);
+pageRoutes.get('/sub.rss', handleSubscriptionFeed);
