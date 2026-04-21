@@ -791,25 +791,22 @@ apiRoutes.post('/rss/test-connection', createValidationMiddleware(z.object({
 apiRoutes.get('/tracked-topics', async (c) => {
     try {
         const dbService = c.get('dbService');
-        const tracker = new TopicTrackerService(dbService);
-        const search = c.req.query('search')?.trim().toLowerCase() || '';
-        const topics = tracker.listTrackedTopics()
-            .map((topic) => ({
-                ...topic,
-                latest_reply: topic.id ? dbService.getLatestTopicReplyByTopicId(topic.id) : null,
-            }))
-            .filter((topic) => {
-                if (!search) return true;
+        const search = c.req.query('search')?.trim() || '';
+        const sortBy = (c.req.query('sortBy') as 'updated_at' | 'reply_count' | 'created_at' | 'title' | undefined) || 'updated_at';
+        const sortOrder = (c.req.query('sortOrder') as 'asc' | 'desc' | undefined) || 'desc';
+        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+        const limit = Math.max(1, Math.min(100, parseInt(c.req.query('limit') || '10', 10) || 10));
 
-                const latestReply = topic.latest_reply;
-                return (
-                    topic.title.toLowerCase().includes(search) ||
-                    String(topic.post_id).includes(search) ||
-                    latestReply?.reply_author?.toLowerCase().includes(search) ||
-                    latestReply?.reply_content?.toLowerCase().includes(search)
-                );
-            });
-        return c.json(createSuccessResponse(topics));
+        const result = dbService.getTrackedTopicsWithLatestReply({
+            enabledOnly: true,
+            search,
+            sortBy,
+            sortOrder,
+            page,
+            limit,
+        });
+
+        return c.json(createSuccessResponse(result));
     } catch (error) {
         return c.json(createErrorResponse(`获取追踪列表失败: ${error}`), 500);
     }

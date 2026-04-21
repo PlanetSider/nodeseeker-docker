@@ -285,6 +285,15 @@ export const HomePage: FC = () => {
             <label for="trackedTopicsSearch" class="form-label">搜索追踪列表</label>
             <input type="text" id="trackedTopicsSearch" class="input-field" placeholder="按标题、Track ID、最近回复作者或内容搜索" />
           </div>
+          <div class="form-group">
+            <label for="trackedTopicsSort" class="form-label">排序方式</label>
+            <select id="trackedTopicsSort" class="input-field">
+              <option value="updated_at:desc">最近更新优先</option>
+              <option value="reply_count:desc">回复数从高到低</option>
+              <option value="created_at:desc">最新添加优先</option>
+              <option value="title:asc">标题 A-Z</option>
+            </select>
+          </div>
 
           <div id="trackedTopicsList" class="subscriptions-list" style={{ marginTop: "20px" }}>
             <div class="skeleton-wrapper">
@@ -294,6 +303,21 @@ export const HomePage: FC = () => {
                   <div class="skeleton skeleton-line"></div>
                 </div>
               ))}
+            </div>
+          </div>
+          <div id="trackedTopicsPagination" class="pagination-wrapper" style={{ display: "none", marginTop: "16px" }}>
+            <div class="pagination-controls">
+              <button id="trackedTopicsPrevBtn" class="pagination-btn icon-only" title="上一页">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                  <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </button>
+              <span id="trackedTopicsPaginationInfo">1 / 1</span>
+              <button id="trackedTopicsNextBtn" class="pagination-btn icon-only" title="下一页">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                  <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </button>
             </div>
           </div>
         </div>

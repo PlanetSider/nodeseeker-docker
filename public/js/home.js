@@ -1375,11 +1375,35 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  async function loadTrackedTopics() {
+  let trackedTopicsPage = 1;
+  let trackedTopicsTotalPages = 1;
+
+  function getTrackedTopicsSortParams() {
+    const sortValue = document.getElementById("trackedTopicsSort")?.value || "updated_at:desc";
+    const [sortBy, sortOrder] = sortValue.split(":");
+    return { sortBy, sortOrder };
+  }
+
+  async function loadTrackedTopics(page = trackedTopicsPage) {
     const search = document.getElementById("trackedTopicsSearch")?.value?.trim() || "";
-    const query = search ? `?search=${encodeURIComponent(search)}` : "";
+    const { sortBy, sortOrder } = getTrackedTopicsSortParams();
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: "8",
+      sortBy,
+      sortOrder,
+    });
+    if (search) {
+      params.set("search", search);
+    }
+
+    const query = `?${params.toString()}`;
     const result = await apiRequest(`/api/tracked-topics${query}`);
     const container = document.getElementById("trackedTopicsList");
+    const pagination = document.getElementById("trackedTopicsPagination");
+    const paginationInfo = document.getElementById("trackedTopicsPaginationInfo");
+    const prevBtn = document.getElementById("trackedTopicsPrevBtn");
+    const nextBtn = document.getElementById("trackedTopicsNextBtn");
     if (!container) return;
 
     if (!result?.success) {
@@ -1387,7 +1411,9 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const topics = result.data || [];
+    const topics = result.data?.topics || [];
+    trackedTopicsPage = result.data?.page || 1;
+    trackedTopicsTotalPages = result.data?.totalPages || 1;
     if (topics.length === 0) {
       container.innerHTML = `
         <div class="empty-state-small">
@@ -1395,6 +1421,7 @@ document.addEventListener("DOMContentLoaded", function () {
           <div class="empty-title">暂无追踪中的帖子</div>
         </div>
       `;
+      if (pagination) pagination.style.display = "none";
       return;
     }
 
@@ -1403,6 +1430,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const latestReply = topic.latest_reply;
       const latestReplyAuthor = latestReply?.reply_author ? escapeHtml(latestReply.reply_author) : "-";
       const latestReplyTime = latestReply?.reply_time ? formatDateTime(latestReply.reply_time) : "-";
+      const latestNotifyStatus = latestReply ? (latestReply.notified === 1 ? "✅ 已通知" : "⏳ 未通知") : "-";
       const latestReplyPreview = latestReply?.reply_content
         ? escapeHtml(latestReply.reply_content.length > 140 ? `${latestReply.reply_content.slice(0, 140)}...` : latestReply.reply_content)
         : "暂无回复预览";
@@ -1415,6 +1443,7 @@ document.addEventListener("DOMContentLoaded", function () {
           <div class="subscription-filters">
             <span class="tag">💬 回复数 ${topic.last_seen_reply_count || 0}</span>
             <span class="tag">🕒 ${checkedAt}</span>
+            <span class="tag">🔔 ${latestNotifyStatus}</span>
           </div>
           <div style="margin: 8px 0 12px; font-weight: 500;">${escapeHtml(topic.title)}</div>
           <div style="margin: 8px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg-hover); font-size: 13px; line-height: 1.5;">
@@ -1449,11 +1478,36 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       });
     });
+
+    if (pagination && paginationInfo && prevBtn && nextBtn) {
+      pagination.style.display = trackedTopicsTotalPages > 1 ? "flex" : "none";
+      paginationInfo.textContent = `${trackedTopicsPage} / ${trackedTopicsTotalPages}`;
+      prevBtn.disabled = trackedTopicsPage <= 1;
+      nextBtn.disabled = trackedTopicsPage >= trackedTopicsTotalPages;
+    }
   }
 
   function initTrackedTopics() {
     document.getElementById("trackedTopicsSearch")?.addEventListener("input", () => {
-      loadTrackedTopics();
+      trackedTopicsPage = 1;
+      loadTrackedTopics(1);
+    });
+
+    document.getElementById("trackedTopicsSort")?.addEventListener("change", () => {
+      trackedTopicsPage = 1;
+      loadTrackedTopics(1);
+    });
+
+    document.getElementById("trackedTopicsPrevBtn")?.addEventListener("click", () => {
+      if (trackedTopicsPage > 1) {
+        loadTrackedTopics(trackedTopicsPage - 1);
+      }
+    });
+
+    document.getElementById("trackedTopicsNextBtn")?.addEventListener("click", () => {
+      if (trackedTopicsPage < trackedTopicsTotalPages) {
+        loadTrackedTopics(trackedTopicsPage + 1);
+      }
     });
 
     document.getElementById("trackedTopicForm")?.addEventListener("submit", async (e) => {

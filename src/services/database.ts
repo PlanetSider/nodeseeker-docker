@@ -895,6 +895,73 @@ export class DatabaseService {
     return stmt.get(trackedTopicId) as TopicReply | null;
   }
 
+  getTrackedTopicsWithLatestReply(options?: {
+    enabledOnly?: boolean;
+    search?: string;
+    sortBy?: 'updated_at' | 'reply_count' | 'created_at' | 'title';
+    sortOrder?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+  }): {
+    topics: Array<TrackedTopic & { latest_reply: TopicReply | null }>;
+    total: number;
+    page: number;
+    totalPages: number;
+  } {
+    const enabledOnly = options?.enabledOnly ?? true;
+    const search = options?.search?.trim().toLowerCase() || '';
+    const sortBy = options?.sortBy || 'updated_at';
+    const sortOrder = options?.sortOrder === 'asc' ? 'asc' : 'desc';
+    const page = Math.max(1, options?.page || 1);
+    const limit = Math.max(1, Math.min(100, options?.limit || 10));
+
+    const allTopics = this.getTrackedTopics(enabledOnly).map((topic) => ({
+      ...topic,
+      latest_reply: topic.id ? this.getLatestTopicReplyByTopicId(topic.id) : null,
+    })).filter((topic) => {
+      if (!search) return true;
+
+      const latestReply = topic.latest_reply;
+      return (
+        topic.title.toLowerCase().includes(search) ||
+        String(topic.post_id).includes(search) ||
+        latestReply?.reply_author?.toLowerCase().includes(search) ||
+        latestReply?.reply_content?.toLowerCase().includes(search)
+      );
+    });
+
+    const sortedTopics = allTopics.sort((a, b) => {
+      const direction = sortOrder === 'asc' ? 1 : -1;
+
+      if (sortBy === 'reply_count') {
+        return ((a.last_seen_reply_count || 0) - (b.last_seen_reply_count || 0)) * direction;
+      }
+
+      if (sortBy === 'created_at') {
+        return ((new Date(a.created_at || 0).getTime()) - (new Date(b.created_at || 0).getTime())) * direction;
+      }
+
+      if (sortBy === 'title') {
+        return a.title.localeCompare(b.title, 'zh-CN') * direction;
+      }
+
+      const aUpdated = new Date(a.last_checked_at || a.updated_at || a.created_at || 0).getTime();
+      const bUpdated = new Date(b.last_checked_at || b.updated_at || b.created_at || 0).getTime();
+      return (aUpdated - bUpdated) * direction;
+    });
+
+    const total = sortedTopics.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const offset = (page - 1) * limit;
+
+    return {
+      topics: sortedTopics.slice(offset, offset + limit),
+      total,
+      page,
+      totalPages,
+    };
+  }
+
   markTopicRepliesNotified(replyIds: number[]): void {
     if (replyIds.length === 0) return;
 
