@@ -1,5 +1,6 @@
 import { Bot, Context, webhookCallback } from 'grammy';
 import { DatabaseService } from './database';
+import { TopicTrackerService } from './topicTracker';
 import type { Post, KeywordSub, TelegramUser } from '../types';
 import { logger } from '../utils/logger';
 
@@ -153,6 +154,30 @@ export class TelegramService {
         return;
       }
       await this.handlePostCommand(ctx);
+    });
+
+    this.bot.command('track', async (ctx) => {
+      if (!this.checkUserPermission(ctx)) {
+        await ctx.reply('❌ 您没有权限使用此功能。请先发送 /start 进行绑定。');
+        return;
+      }
+      await this.handleTrackCommand(ctx);
+    });
+
+    this.bot.command('untrack', async (ctx) => {
+      if (!this.checkUserPermission(ctx)) {
+        await ctx.reply('❌ 您没有权限使用此功能。请先发送 /start 进行绑定。');
+        return;
+      }
+      await this.handleUntrackCommand(ctx);
+    });
+
+    this.bot.command('tracks', async (ctx) => {
+      if (!this.checkUserPermission(ctx)) {
+        await ctx.reply('❌ 您没有权限使用此功能。请先发送 /start 进行绑定。');
+        return;
+      }
+      await this.handleTracksCommand(ctx);
     });
 
     // 处理 /help 命令（允许所有人查看）
@@ -338,6 +363,9 @@ export class TelegramService {
         { command: 'add', description: '添加订阅 (用法: /add 关键词1 关键词2)' },
         { command: 'del', description: '删除订阅 (用法: /del 订阅ID)' },
         { command: 'post', description: '查看最近文章' },
+        { command: 'track', description: '追踪帖子回复 (用法: /track 694190)' },
+        { command: 'untrack', description: '停止追踪帖子 (用法: /untrack 694190)' },
+        { command: 'tracks', description: '查看追踪中的帖子' },
         { command: 'stop', description: '停止推送' },
         { command: 'resume', description: '恢复推送' },
         { command: 'unbind', description: '解除用户绑定' }
@@ -571,6 +599,47 @@ export class TelegramService {
     await ctx.reply(text, { parse_mode: 'Markdown' });
   }
 
+  private async handleTrackCommand(ctx: Context): Promise<void> {
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    if (args.length === 0) {
+      await ctx.reply('❌ 请提供帖子 ID 或链接。\n**用法：** /track 694190', { parse_mode: 'Markdown' });
+      return;
+    }
+
+    const tracker = new TopicTrackerService(this.dbService);
+    const result = await tracker.trackTopic(args[0]);
+    await ctx.reply(result.success ? `✅ ${result.message}` : `❌ ${result.message}`);
+  }
+
+  private async handleUntrackCommand(ctx: Context): Promise<void> {
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    if (args.length === 0) {
+      await ctx.reply('❌ 请提供帖子 ID 或链接。\n**用法：** /untrack 694190', { parse_mode: 'Markdown' });
+      return;
+    }
+
+    const tracker = new TopicTrackerService(this.dbService);
+    const result = tracker.untrackTopic(args[0]);
+    await ctx.reply(result.success ? `✅ ${result.message}` : `❌ ${result.message}`);
+  }
+
+  private async handleTracksCommand(ctx: Context): Promise<void> {
+    const tracker = new TopicTrackerService(this.dbService);
+    const topics = tracker.listTrackedTopics();
+
+    if (topics.length === 0) {
+      await ctx.reply('🧵 当前没有正在追踪的帖子。使用 /track 694190 开始追踪。');
+      return;
+    }
+
+    const lines = topics.slice(0, 20).map((topic, index) => {
+      const checkedAt = topic.last_checked_at ? new Date(topic.last_checked_at).toLocaleString('zh-CN') : '未检查';
+      return `${index + 1}. ID:${topic.post_id}\n${topic.title}\n回复数: ${topic.last_seen_reply_count || 0} | 最近检查: ${checkedAt}`;
+    });
+
+    await ctx.reply(`🧵 当前追踪列表\n\n${lines.join('\n\n')}`);
+  }
+
   /**
    * 处理 /help 命令
    */
@@ -589,6 +658,9 @@ export class TelegramService {
 /add 关键词1 关键词2 关键词3 \\- 添加订阅（最多3个关键词）
 /del 订阅ID \\- 根据订阅ID删除订阅
 /post \\- 查看最近10条文章及推送状态
+/track 帖子ID或链接 \\- 开始追踪某个帖子的后续跟帖
+/untrack 帖子ID或链接 \\- 停止追踪某个帖子
+/tracks \\- 查看当前追踪列表
 /help \\- 显示此帮助信息
 
 💡 **使用说明：**
@@ -596,6 +668,7 @@ export class TelegramService {
 \\- 可以设置多个关键词，文章需要包含所有关键词才会推送
 \\- 使用 /list 查看订阅ID，然后用 /del 删除不需要的订阅
 \\- 使用 /getme 查看当前绑定状态和 Bot 详细信息
+\\- 使用 /track 694190 开始追踪某个帖子的后续回复
     `;
 
     await ctx.reply(helpText, { parse_mode: 'Markdown' });

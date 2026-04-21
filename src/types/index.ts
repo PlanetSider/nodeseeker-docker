@@ -99,6 +99,32 @@ export interface ParsedPost {
   pub_date: string;
 }
 
+export interface TrackedTopic {
+  id?: number;
+  post_id: number;
+  topic_url: string;
+  title: string;
+  enabled: number;
+  last_checked_at?: string;
+  last_seen_reply_count?: number;
+  last_seen_reply_key?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TopicReply {
+  id?: number;
+  tracked_topic_id: number;
+  reply_key: string;
+  reply_author?: string;
+  reply_content?: string;
+  reply_time?: string;
+  floor_no?: number;
+  source_url?: string;
+  notified: number;
+  created_at?: string;
+}
+
 // API 响应接口
 export interface ApiResponse<T = any> {
   success: boolean;

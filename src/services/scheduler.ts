@@ -2,6 +2,7 @@ import { DatabaseService } from './database';
 import { RSSService } from './rss';
 import { TelegramPushService } from './telegram/push';
 import { MatcherService } from './matcher';
+import { TopicTrackerService } from './topicTracker';
 import { getEnvConfig } from '../config/env';
 import { logger } from '../utils/logger';
 
@@ -106,6 +107,12 @@ export class SchedulerService {
 
                 const pushResult = await matcherService.processUnpushedPosts();
                 logger.task.info(`匹配: ${pushResult.pushed} | 未匹配: ${pushResult.skipped} | 失败: ${pushResult.failed}`);
+            }
+
+            const topicTrackerService = new TopicTrackerService(this.dbService);
+            const trackedReplyResult = await topicTrackerService.checkTrackedTopics();
+            if (trackedReplyResult.checked > 0) {
+                logger.task.info(`追踪帖子: ${trackedReplyResult.checked} | 新回复: ${trackedReplyResult.newReplies} | 已通知: ${trackedReplyResult.notified}`);
             }
 
             const duration = Date.now() - startTime;

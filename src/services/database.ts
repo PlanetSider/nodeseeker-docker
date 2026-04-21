@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { createDatabaseConnection } from '../config/database';
-import type { BaseConfig, Post, KeywordSub } from '../types';
+import type { BaseConfig, Post, KeywordSub, TrackedTopic, TopicReply } from '../types';
 import { logger } from '../utils/logger';
 
 export class DatabaseService {
@@ -696,6 +696,152 @@ export class DatabaseService {
   getKeywordSubById(id: number): KeywordSub | null {
     const stmt = this.db.query('SELECT * FROM keywords_sub WHERE id = ?');
     return stmt.get(id) as KeywordSub | null;
+  }
+
+  createTrackedTopic(topic: Omit<TrackedTopic, 'id' | 'created_at' | 'updated_at'>): TrackedTopic {
+    const stmt = this.db.query(`
+      INSERT INTO tracked_topics (post_id, topic_url, title, enabled, last_checked_at, last_seen_reply_count, last_seen_reply_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(post_id) DO UPDATE SET
+        topic_url = excluded.topic_url,
+        title = excluded.title,
+        enabled = excluded.enabled,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `);
+
+    const result = stmt.get(
+      topic.post_id,
+      topic.topic_url,
+      topic.title,
+      topic.enabled,
+      topic.last_checked_at || null,
+      topic.last_seen_reply_count || 0,
+      topic.last_seen_reply_key || null,
+    ) as TrackedTopic;
+
+    this.clearCacheByPattern('TrackedTopics');
+    return result;
+  }
+
+  getTrackedTopicByPostId(postId: number): TrackedTopic | null {
+    const stmt = this.db.query('SELECT * FROM tracked_topics WHERE post_id = ? LIMIT 1');
+    return stmt.get(postId) as TrackedTopic | null;
+  }
+
+  getTrackedTopics(enabledOnly: boolean = false): TrackedTopic[] {
+    const cacheKey = this.getCacheKey('getTrackedTopics', [enabledOnly]);
+    const cached = this.getFromCache<TrackedTopic[]>(cacheKey);
+    if (cached !== null) return cached;
+
+    const stmt = this.db.query(`
+      SELECT * FROM tracked_topics
+      ${enabledOnly ? 'WHERE enabled = 1' : ''}
+      ORDER BY created_at DESC
+    `);
+    const topics = stmt.all() as TrackedTopic[];
+    this.setCache(cacheKey, topics, 30000);
+    return topics;
+  }
+
+  updateTrackedTopic(id: number, topic: Partial<Omit<TrackedTopic, 'id' | 'created_at' | 'updated_at'>>): TrackedTopic | null {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (topic.topic_url !== undefined) {
+      updates.push('topic_url = ?');
+      values.push(topic.topic_url);
+    }
+    if (topic.title !== undefined) {
+      updates.push('title = ?');
+      values.push(topic.title);
+    }
+    if (topic.enabled !== undefined) {
+      updates.push('enabled = ?');
+      values.push(topic.enabled);
+    }
+    if (topic.last_checked_at !== undefined) {
+      updates.push('last_checked_at = ?');
+      values.push(topic.last_checked_at);
+    }
+    if (topic.last_seen_reply_count !== undefined) {
+      updates.push('last_seen_reply_count = ?');
+      values.push(topic.last_seen_reply_count);
+    }
+    if (topic.last_seen_reply_key !== undefined) {
+      updates.push('last_seen_reply_key = ?');
+      values.push(topic.last_seen_reply_key);
+    }
+
+    if (updates.length === 0) {
+      return this.getTrackedTopics().find((item) => item.id === id) || null;
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const stmt = this.db.query(`
+      UPDATE tracked_topics
+      SET ${updates.join(', ')}
+      WHERE id = ?
+      RETURNING *
+    `);
+
+    const result = stmt.get(...values) as TrackedTopic | null;
+    this.clearCacheByPattern('TrackedTopics');
+    return result;
+  }
+
+  disableTrackedTopicByPostId(postId: number): boolean {
+    const stmt = this.db.query(`
+      UPDATE tracked_topics
+      SET enabled = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE post_id = ?
+    `);
+    const result = stmt.run(postId);
+    this.clearCacheByPattern('TrackedTopics');
+    return result.changes > 0;
+  }
+
+  createTopicReply(reply: Omit<TopicReply, 'id' | 'created_at'>): TopicReply | null {
+    const stmt = this.db.query(`
+      INSERT INTO topic_replies (tracked_topic_id, reply_key, reply_author, reply_content, reply_time, floor_no, source_url, notified)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tracked_topic_id, reply_key) DO NOTHING
+      RETURNING *
+    `);
+
+    return stmt.get(
+      reply.tracked_topic_id,
+      reply.reply_key,
+      reply.reply_author || null,
+      reply.reply_content || null,
+      reply.reply_time || null,
+      reply.floor_no || null,
+      reply.source_url || null,
+      reply.notified,
+    ) as TopicReply | null;
+  }
+
+  getTopicRepliesByTopicId(trackedTopicId: number): TopicReply[] {
+    const stmt = this.db.query(`
+      SELECT * FROM topic_replies
+      WHERE tracked_topic_id = ?
+      ORDER BY created_at ASC
+    `);
+    return stmt.all(trackedTopicId) as TopicReply[];
+  }
+
+  markTopicRepliesNotified(replyIds: number[]): void {
+    if (replyIds.length === 0) return;
+
+    const placeholders = replyIds.map(() => '?').join(',');
+    const stmt = this.db.query(`
+      UPDATE topic_replies
+      SET notified = 1
+      WHERE id IN (${placeholders})
+    `);
+    stmt.run(...replyIds);
   }
 
   // 数据库初始化检查：只要用户存在即视为已初始化
