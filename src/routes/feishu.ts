@@ -72,44 +72,42 @@ feishuRoutes.post('/test-connection', async (c) => {
 
 feishuRoutes.post('/webhook', async (c) => {
   try {
-    const body = await c.req.json();
-    if (body.challenge) {
-      return c.json({ challenge: body.challenge });
-    }
-
     const dbService = c.get('dbService');
     const config = dbService.getBaseConfig();
+    const body = await c.req.json();
+    const feishuService = new FeishuService(dbService);
+    const parsedEvent = feishuService.parseWebhookEvent(body);
+
+    if (parsedEvent.challenge) {
+      return c.json({ challenge: parsedEvent.challenge });
+    }
+
     if (!config?.feishu_enabled || config.feishu_enabled !== 1) {
       return c.json({ code: 0 });
     }
 
-    const token = c.req.header('x-lark-request-token');
-    if (config.feishu_verification_token?.trim() && token && token !== config.feishu_verification_token.trim()) {
+    const requestToken = c.req.header('x-lark-request-token') || parsedEvent.token;
+    if (!feishuService.validateWebhookToken(requestToken)) {
       return c.json(createErrorResponse('飞书请求校验失败'), 403);
     }
 
-    const event = body.event || body;
-    const message = event.message || event.event?.message;
-    const sender = event.sender || event.event?.sender;
-    if (!message || !sender) {
+    if (parsedEvent.eventType && parsedEvent.eventType !== 'im.message.receive_v1') {
       return c.json({ code: 0 });
     }
 
-    const content = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
-    const text = content?.text?.trim();
-    if (!text) {
+    if (!parsedEvent.chatId || !parsedEvent.senderId || !parsedEvent.text) {
       return c.json({ code: 0 });
     }
 
-    const chatId = message.chat_id;
-    const senderId = sender.sender_id?.open_id || sender.open_id || sender.sender_id?.user_id || '';
-    const senderName = sender.sender_name || senderId || '飞书用户';
+    const replyText = await feishuService.handleTextCommand(
+      parsedEvent.chatId,
+      parsedEvent.senderId,
+      parsedEvent.senderName || parsedEvent.senderId,
+      parsedEvent.text,
+    );
 
-    const feishuService = new FeishuService(dbService);
-    const replyText = await feishuService.handleTextCommand(chatId, senderId, senderName, text);
-
-    if (chatId) {
-      await feishuService.sendMessage(chatId, replyText);
+    if (parsedEvent.chatId) {
+      await feishuService.sendMessage(parsedEvent.chatId, replyText);
     }
 
     return c.json({ code: 0 });

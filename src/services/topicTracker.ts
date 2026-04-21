@@ -38,9 +38,39 @@ export class TopicTrackerService {
     return text
       .replace(/\r/g, '')
       .replace(/\u00a0/g, ' ')
+      .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .replace(/[ \t]{2,}/g, ' ')
       .trim();
+  }
+
+  private removeNoiseNodes(root: ParentNode): void {
+    const selectors = [
+      'script',
+      'style',
+      'noscript',
+      'svg',
+      'iframe',
+      'nav',
+      'footer',
+      '.topic-map',
+      '.topic-navigation',
+      '.post-menu-area',
+      '.post-actions',
+      '.embedded-posts',
+      '.topic-footer-main-buttons',
+      '.crawler-link',
+      '.show-more',
+      '.read-state',
+      '.timeline-container',
+      '.topic-status-info',
+    ];
+
+    for (const selector of selectors) {
+      for (const element of Array.from(root.querySelectorAll(selector))) {
+        element.remove();
+      }
+    }
   }
 
   private getTopicUrl(postIdOrUrl: string | number): string {
@@ -110,37 +140,145 @@ export class TopicTrackerService {
     return createHash('sha1').update(seed).digest('hex');
   }
 
+  private getCandidateReplyElements(document: Document): Element[] {
+    const selectors = [
+      '#topic .topic-post',
+      '#topic article.topic-post',
+      '#topic article[data-post-id]',
+      '.topic-area .topic-post',
+      '.topic-body.clearfix',
+      'article[data-post-id]',
+      'article.topic-post',
+      '.topic-post.clearfix',
+      '.topic-post',
+      'article.boxed',
+    ];
+
+    for (const selector of selectors) {
+      const elements = Array.from(document.querySelectorAll(selector));
+      if (elements.length > 0) {
+        return elements;
+      }
+    }
+
+    return Array.from(document.querySelectorAll('article, .topic-post'));
+  }
+
+  private getReplyContentElement(element: Element): Element | null {
+    return (
+      element.querySelector('.topic-body .cooked') ||
+      element.querySelector('.topic-body .regular.contents') ||
+      element.querySelector('.cooked') ||
+      element.querySelector('.topic-body') ||
+      element.querySelector('.regular.contents') ||
+      element.querySelector('.contents') ||
+      element.querySelector('.post') ||
+      element
+    );
+  }
+
+  private extractReplyAuthor(element: Element): string {
+    const authorSelectors = [
+      '.topic-meta-data .names .username',
+      '.topic-meta-data .full-name',
+      '.topic-avatar .avatar-link + .names .username',
+      '.names .username',
+      '.topic-meta-data .username',
+      '.creator .username',
+      '.username',
+      '[data-user-card]',
+      '.full-name',
+    ];
+
+    for (const selector of authorSelectors) {
+      const value = this.normalizeText(element.querySelector(selector)?.textContent || '');
+      if (value) {
+        return value;
+      }
+    }
+
+    return '未知用户';
+  }
+
+  private extractReplyTime(element: Element): string | undefined {
+    const timeElement = element.querySelector('.topic-meta-data time, .post-date time, time');
+    const dateTime = timeElement?.getAttribute('datetime');
+    if (dateTime?.trim()) {
+      return dateTime.trim();
+    }
+
+    const text = this.normalizeText(timeElement?.textContent || '');
+    return text || undefined;
+  }
+
+  private extractFloorNo(element: Element): number | undefined {
+    const floorSelectors = [
+      '.post-menu-area .post-number',
+      '.topic-meta-data .post-number',
+      '.post-number',
+      '.topic-post-badges .badge-post-number',
+      '.crawler-post-floor',
+      'a.post-date .post-number',
+      '[data-post-number]',
+    ];
+
+    for (const selector of floorSelectors) {
+      const raw =
+        element.querySelector(selector)?.getAttribute('data-post-number') ||
+        this.normalizeText(element.querySelector(selector)?.textContent || '');
+      const value = raw ? parseInt(raw.replace(/[^\d]/g, ''), 10) : NaN;
+      if (!Number.isNaN(value) && value > 0) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private buildStableReplyKey(element: Element, author: string, replyTime: string | undefined, content: string, floorNo: number | undefined): string {
+    const structuralId =
+      element.getAttribute('data-post-id') ||
+      element.querySelector('[data-post-id]')?.getAttribute('data-post-id') ||
+      element.getAttribute('data-id') ||
+      element.getAttribute('id') ||
+      '';
+
+    if (structuralId) {
+      return this.buildReplyKey(`id:${structuralId}`);
+    }
+
+    if (floorNo) {
+      return this.buildReplyKey(`floor:${floorNo}`);
+    }
+
+    const normalizedContent = content.slice(0, 500);
+    return this.buildReplyKey(`fallback:${author}|${replyTime || ''}|${normalizedContent}`);
+  }
+
   private parseReplies(html: string, topicUrl: string): { title: string; replies: ParsedReply[] } {
     const { document } = parseHTML(html);
+    this.removeNoiseNodes(document);
     const title = this.normalizeText(document.querySelector('title')?.textContent || '未命名帖子');
 
-    const replyContainers = Array.from(document.querySelectorAll('article, .topic-post, .topic-body, .cooked'));
+    const replyContainers = this.getCandidateReplyElements(document);
     const replies: ParsedReply[] = [];
     const seenKeys = new Set<string>();
 
-    for (const [index, element] of replyContainers.entries()) {
-      const contentElement = element.querySelector('.cooked, .topic-body, .regular.contents, .contents') || element;
+    for (const element of replyContainers) {
+      const contentElement = this.getReplyContentElement(element);
+      if (!contentElement) {
+        continue;
+      }
+
       const content = this.normalizeText(contentElement.textContent || '');
       if (content.length < 20) {
         continue;
       }
 
-      const author = this.normalizeText(
-        element.querySelector('.creator, .names .username, .topic-meta-data .username, .username')?.textContent || '',
-      );
-      const replyTime =
-        element.querySelector('time')?.getAttribute('datetime') ||
-        this.normalizeText(element.querySelector('time')?.textContent || '') ||
-        undefined;
-      const floorText = this.normalizeText(
-        element.querySelector('.post-number, .topic-post-badges .badge-post-number, .crawler-post-floor')?.textContent || '',
-      );
-      const floorNo = floorText ? parseInt(floorText.replace(/[^\d]/g, ''), 10) || undefined : undefined;
-      const rawKey =
-        element.getAttribute('data-post-id') ||
-        element.getAttribute('id') ||
-        `${author}|${replyTime || ''}|${content.slice(0, 120)}|${index}`;
-      const replyKey = this.buildReplyKey(rawKey);
+      const author = this.extractReplyAuthor(element);
+      const replyTime = this.extractReplyTime(element);
+      const floorNo = this.extractFloorNo(element);
+      const replyKey = this.buildStableReplyKey(element, author, replyTime, content, floorNo);
 
       if (seenKeys.has(replyKey)) {
         continue;
@@ -159,7 +297,7 @@ export class TopicTrackerService {
 
     return {
       title,
-      replies: replies.slice(1),
+      replies: replies.filter((reply) => reply.floorNo !== 1),
     };
   }
 

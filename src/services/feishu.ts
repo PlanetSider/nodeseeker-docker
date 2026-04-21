@@ -8,6 +8,16 @@ interface FeishuTenantAccessTokenResponse {
   tenant_access_token?: string;
 }
 
+interface FeishuWebhookPayload {
+  challenge?: string;
+  encrypt?: string;
+  header?: {
+    event_type?: string;
+    token?: string;
+  };
+  event?: any;
+}
+
 export class FeishuService {
   constructor(private dbService: DatabaseService) {}
 
@@ -117,6 +127,39 @@ export class FeishuService {
     };
   }
 
+  private parseCommandText(content: unknown): string {
+    if (!content) {
+      return '';
+    }
+
+    if (typeof content === 'string') {
+      try {
+        const parsed = JSON.parse(content);
+        return this.parseCommandText(parsed);
+      } catch {
+        return content.trim();
+      }
+    }
+
+    if (typeof content === 'object') {
+      const record = content as Record<string, unknown>;
+      if (typeof record.text === 'string') {
+        return record.text.trim();
+      }
+    }
+
+    return '';
+  }
+
+  validateWebhookToken(token?: string): boolean {
+    const config = this.getConfig();
+    if (!config?.feishu_verification_token?.trim()) {
+      return true;
+    }
+
+    return token === config.feishu_verification_token.trim();
+  }
+
   private normalizeCommand(text: string): string {
     return text.trim().replace(/^\//, '');
   }
@@ -223,5 +266,51 @@ export class FeishuService {
     }
 
     return '暂不支持该命令。当前支持: /start /help /track /untrack /tracks';
+  }
+
+  parseWebhookEvent(payload: FeishuWebhookPayload): {
+    challenge?: string;
+    eventType?: string;
+    token?: string;
+    chatId?: string;
+    senderId?: string;
+    senderName?: string;
+    text?: string;
+  } {
+    if (payload.challenge) {
+      return { challenge: payload.challenge };
+    }
+
+    const event = payload.event || {};
+    const message = event.message || event.im?.message || event.event?.message || {};
+    const sender = event.sender || event.operator || event.event?.sender || {};
+    const senderId =
+      sender.sender_id?.open_id ||
+      sender.sender_id?.user_id ||
+      sender.open_id ||
+      sender.user_id ||
+      '';
+    const senderName =
+      sender.sender_name ||
+      sender.name ||
+      sender.user_name ||
+      senderId ||
+      '飞书用户';
+    const chatId =
+      message.chat_id ||
+      message.open_chat_id ||
+      event.open_chat_id ||
+      event.chat_id ||
+      '';
+    const text = this.parseCommandText(message.content || event.content || event.text || '');
+
+    return {
+      eventType: payload.header?.event_type,
+      token: payload.header?.token,
+      chatId,
+      senderId,
+      senderName,
+      text,
+    };
   }
 }
