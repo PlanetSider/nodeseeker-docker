@@ -9,6 +9,7 @@ import { MeowService } from '../services/notification/meow';
 import { ServerChanService } from '../services/notification/serverchan';
 import { MatcherService } from '../services/matcher';
 import { AISummaryService } from '../services/aiSummary';
+import { TopicTrackerService } from '../services/topicTracker';
 import { createValidationMiddleware, createQueryValidationMiddleware, createParamValidationMiddleware } from '../utils/validation';
 import { createSuccessResponse, createErrorResponse } from '../utils/helpers';
 import {
@@ -784,5 +785,54 @@ apiRoutes.post('/rss/test-connection', createValidationMiddleware(z.object({
         return c.json(createSuccessResponse(result, result.accessible ? 'RSS 源连接测试成功' : 'RSS 源连接测试失败'));
     } catch (error) {
         return c.json(createErrorResponse(`RSS 连接测试失败: ${error}`), 500);
+    }
+});
+
+apiRoutes.get('/tracked-topics', async (c) => {
+    try {
+        const dbService = c.get('dbService');
+        const tracker = new TopicTrackerService(dbService);
+        const topics = tracker.listTrackedTopics();
+        return c.json(createSuccessResponse(topics));
+    } catch (error) {
+        return c.json(createErrorResponse(`获取追踪列表失败: ${error}`), 500);
+    }
+});
+
+apiRoutes.post('/tracked-topics', createValidationMiddleware(z.object({
+    topic: z.string().min(1, '请提供帖子 ID 或链接'),
+})), async (c) => {
+    try {
+        const { topic } = c.get('validatedData');
+        const dbService = c.get('dbService');
+        const tracker = new TopicTrackerService(dbService);
+        const result = await tracker.trackTopic(topic);
+
+        if (result.success) {
+            return c.json(createSuccessResponse(null, result.message));
+        }
+
+        return c.json(createErrorResponse(result.message), 400);
+    } catch (error) {
+        return c.json(createErrorResponse(`添加追踪失败: ${error}`), 500);
+    }
+});
+
+apiRoutes.delete('/tracked-topics/:postId', createParamValidationMiddleware(z.object({
+    postId: z.coerce.number().int().positive(),
+})), async (c) => {
+    try {
+        const { postId } = c.get('validatedParams');
+        const dbService = c.get('dbService');
+        const tracker = new TopicTrackerService(dbService);
+        const result = tracker.untrackTopic(String(postId));
+
+        if (result.success) {
+            return c.json(createSuccessResponse(null, result.message));
+        }
+
+        return c.json(createErrorResponse(result.message), 400);
+    } catch (error) {
+        return c.json(createErrorResponse(`停止追踪失败: ${error}`), 500);
     }
 });

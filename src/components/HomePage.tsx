@@ -41,6 +41,9 @@ export const HomePage: FC = () => {
                 <button class="dropdown-item" data-drawer="subscriptions">
                   <span>📝</span> 订阅管理
                 </button>
+                <button class="dropdown-item" data-drawer="trackedTopics">
+                  <span>🧵</span> 追踪列表
+                </button>
                 <button class="dropdown-item" data-drawer="rss">
                   <span>📡</span> RSS 配置
                 </button>
@@ -244,6 +247,41 @@ export const HomePage: FC = () => {
 
           {/* 订阅列表 */}
           <div id="subscriptionsList" class="subscriptions-list">
+            <div class="skeleton-wrapper">
+              {[1, 2, 3].map(() => (
+                <div class="skeleton-list-item">
+                  <div class="skeleton skeleton-badge"></div>
+                  <div class="skeleton skeleton-line"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 追踪列表抽屉 */}
+      <div id="trackedTopicsDrawer" class="drawer drawer-large" style="display: none;">
+        <div class="drawer-header">
+          <h3 class="drawer-title">追踪列表</h3>
+          <button class="drawer-close" data-drawer="trackedTopics">
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+        <div class="drawer-content">
+          <form id="trackedTopicForm" class="form-stack">
+            <div class="form-group">
+              <label for="trackedTopicInput" class="form-label">帖子 ID 或链接</label>
+              <input type="text" id="trackedTopicInput" class="input-field" placeholder="694190 或 https://www.nodeseek.com/post-694190-1" />
+              <span class="form-hint">添加后系统会持续检查该帖子的后续跟帖更新，并通过当前启用的推送通道发送通知。</span>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">开始追踪</button>
+            </div>
+          </form>
+
+          <div id="trackedTopicsList" class="subscriptions-list" style={{ marginTop: "20px" }}>
             <div class="skeleton-wrapper">
               {[1, 2, 3].map(() => (
                 <div class="skeleton-list-item">

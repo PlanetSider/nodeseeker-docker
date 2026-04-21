@@ -1375,6 +1375,93 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  async function loadTrackedTopics() {
+    const result = await apiRequest("/api/tracked-topics");
+    const container = document.getElementById("trackedTopicsList");
+    if (!container) return;
+
+    if (!result?.success) {
+      container.innerHTML = "<p>加载失败</p>";
+      return;
+    }
+
+    const topics = result.data || [];
+    if (topics.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state-small">
+          <div class="empty-icon">🧵</div>
+          <div class="empty-title">暂无追踪中的帖子</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = topics.map((topic) => {
+      const checkedAt = topic.last_checked_at ? formatDateTime(topic.last_checked_at) : "未检查";
+      return `
+        <div class="subscription-item" data-post-id="${topic.post_id}">
+          <div class="subscription-keywords">
+            <span class="tag tag-blue">Track ID: ${topic.post_id}</span>
+            ${topic.enabled === 1 ? '<span class="tag">✅ 追踪中</span>' : '<span class="tag">⏸️ 已停用</span>'}
+          </div>
+          <div class="subscription-filters">
+            <span class="tag">💬 回复数 ${topic.last_seen_reply_count || 0}</span>
+            <span class="tag">🕒 ${checkedAt}</span>
+          </div>
+          <div style="margin: 8px 0 12px; font-weight: 500;">${escapeHtml(topic.title)}</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <a class="btn btn-secondary btn-xs" href="${escapeHtml(topic.topic_url)}" target="_blank" rel="noopener">打开帖子</a>
+            <button class="btn btn-danger btn-xs delete-tracked-topic-btn" data-post-id="${topic.post_id}">停止追踪</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    container.querySelectorAll(".delete-tracked-topic-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const postId = btn.dataset.postId;
+        if (!postId) return;
+        if (!confirm(`确定停止追踪帖子 ${postId} 吗？`)) return;
+
+        const result = await apiRequest(`/api/tracked-topics/${postId}`, {
+          method: "DELETE",
+        });
+
+        if (result?.success) {
+          Toast.success(result.message || "已停止追踪");
+          loadTrackedTopics();
+        } else {
+          Toast.error(result?.message || "停止追踪失败");
+        }
+      });
+    });
+  }
+
+  function initTrackedTopics() {
+    document.getElementById("trackedTopicForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const topic = document.getElementById("trackedTopicInput").value.trim();
+      if (!topic) {
+        Toast.warning("请输入帖子 ID 或链接");
+        return;
+      }
+
+      const result = await apiRequest("/api/tracked-topics", {
+        method: "POST",
+        body: JSON.stringify({ topic }),
+      });
+
+      if (result?.success) {
+        Toast.success(result.message || "已开始追踪");
+        document.getElementById("trackedTopicInput").value = "";
+        loadTrackedTopics();
+      } else {
+        Toast.error(result?.message || "添加追踪失败");
+      }
+    });
+  }
+
   // ============================================
   // 筛选面板订阅下拉框
   // ============================================
@@ -1606,6 +1693,8 @@ document.addEventListener("DOMContentLoaded", function () {
         // 加载对应数据并打开抽屉
         if (drawerName === "subscriptions") {
           loadSubscriptions();
+        } else if (drawerName === "trackedTopics") {
+          loadTrackedTopics();
         } else if (drawerName === "rss") {
           loadRssConfig();
         } else if (drawerName === "telegram") {
@@ -1774,6 +1863,7 @@ document.addEventListener("DOMContentLoaded", function () {
     initRssConfig();
     initTelegramConfig();
     initFeishuConfig();
+    initTrackedTopics();
     initSubscriptions();
     initSettingsDropdown();
     initLoginModal();
