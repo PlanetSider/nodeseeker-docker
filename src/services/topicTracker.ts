@@ -261,6 +261,7 @@ export class TopicTrackerService {
     const title = this.normalizeText(document.querySelector('title')?.textContent || '未命名帖子');
 
     const replyContainers = this.getCandidateReplyElements(document);
+    logger.debug(`追踪解析候选节点: ${replyContainers.length} | ${topicUrl}`);
     const replies: ParsedReply[] = [];
     const seenKeys = new Set<string>();
 
@@ -281,6 +282,7 @@ export class TopicTrackerService {
       const replyKey = this.buildStableReplyKey(element, author, replyTime, content, floorNo);
 
       if (seenKeys.has(replyKey)) {
+        logger.debug(`追踪解析跳过重复回复: ${replyKey} | ${author} | floor=${floorNo || '-'} | ${topicUrl}`);
         continue;
       }
       seenKeys.add(replyKey);
@@ -429,6 +431,7 @@ export class TopicTrackerService {
         const existingReplies = this.dbService.getTopicRepliesByTopicId(topic.id!);
         const existingKeys = new Set(existingReplies.map((reply) => reply.reply_key));
         const freshReplies = replies.filter((reply) => !existingKeys.has(reply.replyKey));
+        logger.debug(`追踪帖子检查完成: ${topic.post_id} | 已有=${existingReplies.length} | 当前=${replies.length} | 新增=${freshReplies.length}`);
 
         if (freshReplies.length === 0) {
           this.dbService.updateTrackedTopic(topic.id!, {

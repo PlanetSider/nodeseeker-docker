@@ -792,7 +792,23 @@ apiRoutes.get('/tracked-topics', async (c) => {
     try {
         const dbService = c.get('dbService');
         const tracker = new TopicTrackerService(dbService);
-        const topics = tracker.listTrackedTopics();
+        const search = c.req.query('search')?.trim().toLowerCase() || '';
+        const topics = tracker.listTrackedTopics()
+            .map((topic) => ({
+                ...topic,
+                latest_reply: topic.id ? dbService.getLatestTopicReplyByTopicId(topic.id) : null,
+            }))
+            .filter((topic) => {
+                if (!search) return true;
+
+                const latestReply = topic.latest_reply;
+                return (
+                    topic.title.toLowerCase().includes(search) ||
+                    String(topic.post_id).includes(search) ||
+                    latestReply?.reply_author?.toLowerCase().includes(search) ||
+                    latestReply?.reply_content?.toLowerCase().includes(search)
+                );
+            });
         return c.json(createSuccessResponse(topics));
     } catch (error) {
         return c.json(createErrorResponse(`获取追踪列表失败: ${error}`), 500);

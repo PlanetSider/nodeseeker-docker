@@ -1376,7 +1376,9 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function loadTrackedTopics() {
-    const result = await apiRequest("/api/tracked-topics");
+    const search = document.getElementById("trackedTopicsSearch")?.value?.trim() || "";
+    const query = search ? `?search=${encodeURIComponent(search)}` : "";
+    const result = await apiRequest(`/api/tracked-topics${query}`);
     const container = document.getElementById("trackedTopicsList");
     if (!container) return;
 
@@ -1398,6 +1400,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     container.innerHTML = topics.map((topic) => {
       const checkedAt = topic.last_checked_at ? formatDateTime(topic.last_checked_at) : "未检查";
+      const latestReply = topic.latest_reply;
+      const latestReplyAuthor = latestReply?.reply_author ? escapeHtml(latestReply.reply_author) : "-";
+      const latestReplyTime = latestReply?.reply_time ? formatDateTime(latestReply.reply_time) : "-";
+      const latestReplyPreview = latestReply?.reply_content
+        ? escapeHtml(latestReply.reply_content.length > 140 ? `${latestReply.reply_content.slice(0, 140)}...` : latestReply.reply_content)
+        : "暂无回复预览";
       return `
         <div class="subscription-item" data-post-id="${topic.post_id}">
           <div class="subscription-keywords">
@@ -1409,6 +1417,12 @@ document.addEventListener("DOMContentLoaded", function () {
             <span class="tag">🕒 ${checkedAt}</span>
           </div>
           <div style="margin: 8px 0 12px; font-weight: 500;">${escapeHtml(topic.title)}</div>
+          <div style="margin: 8px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg-hover); font-size: 13px; line-height: 1.5;">
+            <div style="font-weight: 600; margin-bottom: 6px;">最近回复</div>
+            <div style="margin-bottom: 4px;">👤 ${latestReplyAuthor}</div>
+            <div style="margin-bottom: 8px;">🕒 ${latestReplyTime}</div>
+            <div style="color: var(--text-secondary);">${latestReplyPreview}</div>
+          </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <a class="btn btn-secondary btn-xs" href="${escapeHtml(topic.topic_url)}" target="_blank" rel="noopener">打开帖子</a>
             <button class="btn btn-danger btn-xs delete-tracked-topic-btn" data-post-id="${topic.post_id}">停止追踪</button>
@@ -1438,6 +1452,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function initTrackedTopics() {
+    document.getElementById("trackedTopicsSearch")?.addEventListener("input", () => {
+      loadTrackedTopics();
+    });
+
     document.getElementById("trackedTopicForm")?.addEventListener("submit", async (e) => {
       e.preventDefault();
 

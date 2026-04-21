@@ -885,6 +885,16 @@ export class DatabaseService {
     return stmt.all(trackedTopicId) as TopicReply[];
   }
 
+  getLatestTopicReplyByTopicId(trackedTopicId: number): TopicReply | null {
+    const stmt = this.db.query(`
+      SELECT * FROM topic_replies
+      WHERE tracked_topic_id = ?
+      ORDER BY COALESCE(reply_time, created_at) DESC, id DESC
+      LIMIT 1
+    `);
+    return stmt.get(trackedTopicId) as TopicReply | null;
+  }
+
   markTopicRepliesNotified(replyIds: number[]): void {
     if (replyIds.length === 0) return;
 

@@ -281,6 +281,11 @@ export const HomePage: FC = () => {
             </div>
           </form>
 
+          <div class="form-group" style={{ marginTop: "20px" }}>
+            <label for="trackedTopicsSearch" class="form-label">搜索追踪列表</label>
+            <input type="text" id="trackedTopicsSearch" class="input-field" placeholder="按标题、Track ID、最近回复作者或内容搜索" />
+          </div>
+
           <div id="trackedTopicsList" class="subscriptions-list" style={{ marginTop: "20px" }}>
             <div class="skeleton-wrapper">
               {[1, 2, 3].map(() => (
