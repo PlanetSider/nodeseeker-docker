@@ -365,26 +365,36 @@ export class TopicTrackerService {
     return this.dbService.getTrackedTopics(true);
   }
 
-  private buildTrackedReplyMessage(topic: TrackedTopic, reply: TopicReply): { title: string; markdown: string; richText: string; url: string } {
+  private buildTrackedReplyMessage(topic: TrackedTopic, replies: TopicReply[]): { title: string; markdown: string; richText: string; url: string } {
     const title = `跟帖更新：${topic.title}`;
-    const preview = this.normalizeText(reply.reply_content || '').slice(0, 500);
-    const floor = reply.floor_no ? `#${reply.floor_no}` : '新回复';
+    const latestReply = replies.at(-1)!;
+    const preview = this.normalizeText(latestReply.reply_content || '').slice(0, 500);
+    const floor = latestReply.floor_no ? `#${latestReply.floor_no}` : '新回复';
+    const replyCount = replies.length;
     const url = topic.topic_url;
-    const markdown = `**你追踪的帖子有新回复**\n\n**${topic.title}**\n\n楼层: ${floor}\n作者: ${reply.reply_author || '未知用户'}\n\n${preview}\n\n${url}`;
-    const richText = [`你追踪的帖子有新回复`, topic.title, `楼层: ${floor}`, `作者: ${reply.reply_author || '未知用户'}`, preview, url]
+    const markdown = `**你追踪的帖子有新回复**\n\n**${topic.title}**\n\n新增回复数: ${replyCount}\n最近回复楼层: ${floor}\n最近回复作者: ${latestReply.reply_author || '未知用户'}\n\n${preview}\n\n${url}`;
+    const richText = [
+      `你追踪的帖子有新回复`,
+      topic.title,
+      `新增回复数: ${replyCount}`,
+      `最近回复楼层: ${floor}`,
+      `最近回复作者: ${latestReply.reply_author || '未知用户'}`,
+      preview,
+      url,
+    ]
       .filter(Boolean)
       .join('\n\n');
 
     return { title, markdown, richText, url };
   }
 
-  private async notifyReply(topic: TrackedTopic, reply: TopicReply): Promise<boolean> {
+  private async notifyReplies(topic: TrackedTopic, replies: TopicReply[]): Promise<boolean> {
     const config = this.dbService.getBaseConfig();
     if (!config) {
       return false;
     }
 
-    const message = this.buildTrackedReplyMessage(topic, reply);
+    const message = this.buildTrackedReplyMessage(topic, replies);
     let sent = false;
 
     if (config.bot_token && config.chat_id && config.stop_push !== 1) {
@@ -392,7 +402,7 @@ export class TopicTrackerService {
         const telegramService = new TelegramPushService(this.dbService, config.bot_token);
         sent = await telegramService.sendMessage(config.chat_id, message.markdown) || sent;
       } catch (error) {
-        logger.error(`追踪回复 Telegram 推送失败: ${topic.title}`, error);
+         logger.error(`追踪回复 Telegram 推送失败: ${topic.title}`, error);
       }
     }
 
@@ -402,7 +412,7 @@ export class TopicTrackerService {
         const result = await serverChanService.sendMessage(message.title, message.richText);
         sent = result.success || sent;
       } catch (error) {
-        logger.error(`追踪回复 Server酱 推送失败: ${topic.title}`, error);
+         logger.error(`追踪回复 Server酱 推送失败: ${topic.title}`, error);
       }
     }
 
@@ -412,7 +422,7 @@ export class TopicTrackerService {
         const result = await meowService.sendMessage(message.title, message.richText, message.url);
         sent = result.success || sent;
       } catch (error) {
-        logger.error(`追踪回复 MeoW 推送失败: ${topic.title}`, error);
+         logger.error(`追踪回复 MeoW 推送失败: ${topic.title}`, error);
       }
     }
 
@@ -443,7 +453,7 @@ export class TopicTrackerService {
           continue;
         }
 
-        const insertedReplyIds: number[] = [];
+        const createdReplies: TopicReply[] = [];
         for (const reply of freshReplies) {
           const created = this.dbService.createTopicReply({
             tracked_topic_id: topic.id!,
@@ -457,13 +467,16 @@ export class TopicTrackerService {
           });
 
           if (created?.id) {
-            insertedReplyIds.push(created.id);
+            createdReplies.push(created);
             newReplies++;
-            const sent = await this.notifyReply(topic, created);
-            if (sent) {
-              notified++;
-              this.dbService.markTopicRepliesNotified([created.id]);
-            }
+          }
+        }
+
+        if (createdReplies.length > 0) {
+          const sent = await this.notifyReplies(topic, createdReplies);
+          if (sent) {
+            notified += createdReplies.length;
+            this.dbService.markTopicRepliesNotified(createdReplies.map((reply) => reply.id!).filter(Boolean));
           }
         }
 

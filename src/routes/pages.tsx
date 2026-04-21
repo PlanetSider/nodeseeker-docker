@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { DatabaseService } from '../services/database';
 import { AuthService } from '../services/auth';
+import { RSSExportService } from '../services/rssExport';
 import { InitPage, HomePage, ErrorPage } from '../components';
 import type { ContextVariables } from '../types';
 
@@ -51,3 +52,39 @@ pageRoutes.get('/login', async (c) => {
 pageRoutes.get('/dashboard', async (c) => {
   return c.redirect('/');
 });
+
+pageRoutes.get('/rss.xml', async (c) => {
+  try {
+    const dbService = c.get('dbService');
+    const exportService = new RSSExportService(dbService);
+    const url = new URL(c.req.url);
+    const feedUrl = `${url.origin}/rss.xml`;
+    const xml = exportService.buildFullFeed(feedUrl, url.origin);
+    return c.body(xml, 200, {
+      'Content-Type': 'application/rss+xml; charset=UTF-8',
+      'Cache-Control': 'public, max-age=300',
+    });
+  } catch (error) {
+    return c.html(<ErrorPage message={`生成全量 RSS 失败: ${error}`} />);
+  }
+});
+
+const handleSubscriptionFeed = async (c: any) => {
+  try {
+    const dbService = c.get('dbService');
+    const exportService = new RSSExportService(dbService);
+    const url = new URL(c.req.url);
+    const feedUrl = `${url.origin}/sub.xml`;
+    const xml = exportService.buildSubscriptionFeed(feedUrl, url.origin);
+
+    return c.body(xml, 200, {
+      'Content-Type': 'application/rss+xml; charset=UTF-8',
+      'Cache-Control': 'public, max-age=300',
+    });
+  } catch (error) {
+    return c.html(<ErrorPage message={`生成聚合订阅 RSS 失败: ${error}`} />);
+  }
+};
+
+pageRoutes.get('/sub', handleSubscriptionFeed);
+pageRoutes.get('/sub.xml', handleSubscriptionFeed);
