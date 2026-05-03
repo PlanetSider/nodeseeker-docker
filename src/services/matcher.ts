@@ -252,18 +252,6 @@ export class MatcherService {
         keywordMatched = true;
       }
       
-      // 检查作者匹配（如果没有指定具体的creator过滤条件）
-      if (!keywordMatched && !subscription.creator && this.performMatch(creatorText, keyword)) {
-        matchDetails.authorMatches.push(keyword);
-        keywordMatched = true;
-      }
-      
-      // 检查分类匹配（如果没有指定具体的category过滤条件）
-      if (!keywordMatched && !subscription.category && this.performMatch(categoryText, keyword)) {
-        matchDetails.categoryMatches.push(keyword);
-        keywordMatched = true;
-      }
-
       if (keywordMatched) {
         matchedKeywords.push(keyword);
         totalMatchedKeywords++;
