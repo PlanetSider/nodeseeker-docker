@@ -11,16 +11,30 @@ import { AISummaryService } from './aiSummary';
 
 export class RSSService {
   private readonly TIMEOUT: number;
+  private readonly ARTICLE_BODY_ENRICHMENT_ENABLED: boolean;
+  private readonly AI_SUMMARY_ENABLED: boolean;
   private readonly PLAYWRIGHT_FALLBACK: boolean;
+  private readonly MAX_ARTICLE_BROWSER_FALLBACKS: number;
   private readonly rssBrowserService: RSSBrowserService;
   private readonly aiSummaryService: AISummaryService;
 
   constructor(private dbService: DatabaseService) {
     const config = getEnvConfig();
     this.TIMEOUT = config.RSS_TIMEOUT;
+    this.ARTICLE_BODY_ENRICHMENT_ENABLED = config.RSS_ARTICLE_BODY_ENRICHMENT_ENABLED;
+    this.AI_SUMMARY_ENABLED = config.AI_SUMMARY_ENABLED;
     this.PLAYWRIGHT_FALLBACK = config.RSS_PLAYWRIGHT_FALLBACK;
+    this.MAX_ARTICLE_BROWSER_FALLBACKS = Math.max(0, config.RSS_ARTICLE_BROWSER_FALLBACK_LIMIT);
     this.rssBrowserService = new RSSBrowserService();
     this.aiSummaryService = new AISummaryService();
+  }
+
+  private shouldUseArticleBrowserFallback(usedFallbackCount: number): boolean {
+    if (!this.PLAYWRIGHT_FALLBACK) {
+      return false;
+    }
+
+    return usedFallbackCount < this.MAX_ARTICLE_BROWSER_FALLBACKS;
   }
 
   private decodeHtmlEntities(text: string): string {
@@ -210,7 +224,7 @@ export class RSSService {
     return this.stripBoilerplate(this.normalizeText(html));
   }
 
-  private async fetchArticleBody(url: string, cookie?: string): Promise<string | undefined> {
+  private async fetchArticleBody(url: string, cookie?: string, allowBrowserFallback: boolean = false): Promise<string | undefined> {
     try {
       const proxy = this.getProxy();
       const headers: Record<string, string> = {
@@ -243,6 +257,11 @@ export class RSSService {
         return articleBody;
       }
     } catch (error) {
+      if (!allowBrowserFallback) {
+        logger.warn(`正文普通抓取失败，跳过浏览器兜底: ${url}`);
+        return undefined;
+      }
+
       logger.warn(`正文普通抓取失败，尝试 Playwright: ${url}`);
     }
 
@@ -653,18 +672,33 @@ export class RSSService {
         // 第三步：筛选出需要创建的新文章
         const newPostsToCreate = parsedPosts.filter((parsedPost) => !existingPosts.has(parsedPost.post_id));
 
-        for (const post of newPostsToCreate) {
-          try {
-            const articleBody = await this.fetchArticleBody(post.source_url, rssConfig.cookie);
-            if (articleBody) {
-              post.article_body = articleBody;
-              post.memo = articleBody.slice(0, 500);
-              if (baseConfig) {
-                post.ai_summary = await this.aiSummaryService.summarize(baseConfig, post.title, articleBody);
+        let articleBrowserFallbacksUsed = 0;
+
+        if (!this.ARTICLE_BODY_ENRICHMENT_ENABLED) {
+          logger.rss('已关闭文章正文增强，跳过正文抓取与 AI 摘要');
+        } else {
+          for (const post of newPostsToCreate) {
+            const allowBrowserFallback = this.shouldUseArticleBrowserFallback(articleBrowserFallbacksUsed);
+
+            try {
+              const articleBody = await this.fetchArticleBody(post.source_url, rssConfig.cookie, allowBrowserFallback);
+              if (articleBody) {
+                post.article_body = articleBody;
+                post.memo = articleBody.slice(0, 500);
+                if (baseConfig && this.AI_SUMMARY_ENABLED) {
+                  post.ai_summary = await this.aiSummaryService.summarize(baseConfig, post.title, articleBody);
+                }
+              }
+
+              if (allowBrowserFallback && !post.article_body) {
+                articleBrowserFallbacksUsed++;
+              }
+            } catch (error) {
+              logger.error(`补充正文或AI摘要失败 (post_id: ${post.post_id}):`, error);
+              if (allowBrowserFallback) {
+                articleBrowserFallbacksUsed++;
               }
             }
-          } catch (error) {
-            logger.error(`补充正文或AI摘要失败 (post_id: ${post.post_id}):`, error);
           }
         }
 

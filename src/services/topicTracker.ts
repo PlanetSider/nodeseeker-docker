@@ -5,6 +5,7 @@ import { RSSBrowserService } from './rssBrowser';
 import { TelegramPushService } from './telegram/push';
 import { ServerChanService } from './notification/serverchan';
 import { MeowService } from './notification/meow';
+import { getEnvConfig } from '../config/env';
 import { logger } from '../utils/logger';
 import type { TopicReply, TrackedTopic } from '../types';
 
@@ -19,9 +20,17 @@ interface ParsedReply {
 
 export class TopicTrackerService {
   private readonly rssBrowserService: RSSBrowserService;
+  private browserFallbacksUsed: number = 0;
+  private readonly maxBrowserFallbacks: number = 1;
 
   constructor(private dbService: DatabaseService) {
+    const config = getEnvConfig();
     this.rssBrowserService = new RSSBrowserService();
+    this.maxBrowserFallbacks = Math.max(0, config.TRACKED_TOPIC_BROWSER_FALLBACK_LIMIT);
+  }
+
+  private shouldUseBrowserFallback(): boolean {
+    return this.browserFallbacksUsed < this.maxBrowserFallbacks;
   }
 
   private getProxy(): string | undefined {
@@ -131,7 +140,13 @@ export class TopicTrackerService {
       }
       return await response.text();
     } catch (error) {
+      if (!this.shouldUseBrowserFallback()) {
+        logger.warn(`帖子普通抓取失败，跳过浏览器兜底: ${topicUrl}`);
+        throw error;
+      }
+
       logger.warn(`帖子普通抓取失败，尝试 Playwright: ${topicUrl}`);
+      this.browserFallbacksUsed += 1;
       return this.rssBrowserService.fetchPageContent(topicUrl, cookie);
     }
   }
@@ -430,6 +445,7 @@ export class TopicTrackerService {
   }
 
   async checkTrackedTopics(): Promise<{ checked: number; newReplies: number; notified: number }> {
+    this.browserFallbacksUsed = 0;
     const trackedTopics = this.dbService.getTrackedTopics(true);
     let newReplies = 0;
     let notified = 0;

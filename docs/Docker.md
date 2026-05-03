@@ -32,8 +32,17 @@ docker run -d \
   -e CORS_ORIGINS=http://localhost:3010 \
   -e RSS_TIMEOUT=10000 \
   -e RSS_CHECK_ENABLED=true \
+  -e RSS_ARTICLE_BODY_ENRICHMENT_ENABLED=true \
+  -e TRACKED_TOPIC_FETCH_ENABLED=true \
+  -e AI_SUMMARY_ENABLED=true \
   -e RSS_PLAYWRIGHT_FALLBACK=true \
+  -e RSS_ARTICLE_BROWSER_FALLBACK_LIMIT=1 \
+  -e TRACKED_TOPIC_BROWSER_FALLBACK_LIMIT=1 \
+  -e PLAYWRIGHT_FAILURE_THRESHOLD=3 \
+  -e PLAYWRIGHT_COOLDOWN_MS=300000 \
   -e PLAYWRIGHT_HEADLESS=true \
+  --shm-size=1g \
+  --ulimit core=0 \
   -e TELEGRAM_WEBHOOK_URL= \
   -e LOG_LEVEL=info \
   ghcr.io/planetsider/nodeseeker-docker:latest
@@ -50,6 +59,7 @@ docker compose up -d
 1. 拉取最新 GHCR 镜像
 2. 启动应用容器
 3. 挂载本地 `./data` 和 `./logs`
+4. 增大 Chromium 共享内存并关闭 core dump 文件输出
 
 ## 当前 Compose 配置特征
 
@@ -60,6 +70,7 @@ docker compose up -d
 3. 不再包含 `watchtower`
 4. 不再配置容器健康检查
 5. 所有基础运行参数直接写在 `environment` 中
+6. 为 Chromium 增加 `shm_size` 并禁用 `core dump`
 
 ## 当前内置环境参数
 
@@ -74,7 +85,14 @@ docker compose up -d
 | `CORS_ORIGINS` | `http://localhost:3010` | 允许的跨域源 |
 | `RSS_TIMEOUT` | `10000` | RSS 请求超时 |
 | `RSS_CHECK_ENABLED` | `true` | 是否启用定时抓取 |
+| `RSS_ARTICLE_BODY_ENRICHMENT_ENABLED` | `true` | 是否启用文章正文增强；关闭后跳过正文抓取和基于正文的 AI 摘要 |
+| `TRACKED_TOPIC_FETCH_ENABLED` | `true` | 是否启用追踪帖子抓取检查 |
+| `AI_SUMMARY_ENABLED` | `true` | 是否启用 AI 摘要生成 |
 | `RSS_PLAYWRIGHT_FALLBACK` | `true` | RSS 抓取失败时启用 Playwright 兜底 |
+| `RSS_ARTICLE_BROWSER_FALLBACK_LIMIT` | `1` | 每轮 RSS 新文章正文允许触发浏览器兜底的最大次数 |
+| `TRACKED_TOPIC_BROWSER_FALLBACK_LIMIT` | `1` | 每轮帖子追踪允许触发浏览器兜底的最大次数 |
+| `PLAYWRIGHT_FAILURE_THRESHOLD` | `3` | Playwright 连续失败多少次后开启熔断 |
+| `PLAYWRIGHT_COOLDOWN_MS` | `300000` | Playwright 熔断冷却时间（ms） |
 | `PLAYWRIGHT_HEADLESS` | `true` | Playwright 无头模式 |
 | `TELEGRAM_WEBHOOK_URL` | 空字符串 | 可选覆盖 Webhook URL |
 | `LOG_LEVEL` | `info` | 日志级别 |
@@ -113,6 +131,17 @@ RSS_PLAYWRIGHT_FALLBACK: true
 ```yaml
 RSS_PLAYWRIGHT_FALLBACK: false
 ```
+
+当前 Compose 还额外启用了：
+
+1. `shm_size: "1gb"`，降低 Chromium 在容器内因共享内存不足而崩溃的概率
+2. `ulimits.core: 0`，避免原生进程崩溃时持续生成 `core.*` 文件占满磁盘
+
+如果你需要进一步降低风险，建议优先尝试：
+
+1. `RSS_ARTICLE_BODY_ENRICHMENT_ENABLED=false`
+2. `TRACKED_TOPIC_FETCH_ENABLED=false`
+3. `AI_SUMMARY_ENABLED=false`
 
 ## 常用命令
 

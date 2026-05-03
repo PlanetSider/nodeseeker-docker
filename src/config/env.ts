@@ -19,10 +19,27 @@ const envSchema = z.object({
     .string()
     .transform((val) => val !== "false")
     .default("true"),
+  RSS_ARTICLE_BODY_ENRICHMENT_ENABLED: z
+    .string()
+    .transform((val) => val !== "false")
+    .default("true"),
+  TRACKED_TOPIC_FETCH_ENABLED: z
+    .string()
+    .transform((val) => val !== "false")
+    .default("true"),
+  AI_SUMMARY_ENABLED: z
+    .string()
+    .transform((val) => val !== "false")
+    .default("true"),
   RSS_PLAYWRIGHT_FALLBACK: z
     .string()
     .transform((val) => val !== "false")
     .default("true"),
+  RSS_ARTICLE_BROWSER_FALLBACK_LIMIT: z.string().transform(Number).default("1"),
+  TRACKED_TOPIC_BROWSER_FALLBACK_LIMIT: z.string().transform(Number).default("1"),
+  PLAYWRIGHT_FAILURE_THRESHOLD: z.string().transform(Number).default("3"),
+  PLAYWRIGHT_COOLDOWN_MS: z.string().transform(Number).default("300000"),
+  PLAYWRIGHT_MAX_CONCURRENCY: z.string().transform(Number).default("1"),
   PLAYWRIGHT_HEADLESS: z
     .string()
     .transform((val) => val !== "false")

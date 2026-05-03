@@ -37,7 +37,15 @@ docker run -d \
   -e CORS_ORIGINS=http://localhost:3010 \
   -e RSS_TIMEOUT=10000 \
   -e RSS_CHECK_ENABLED=true \
+  -e RSS_ARTICLE_BODY_ENRICHMENT_ENABLED=true \
+  -e TRACKED_TOPIC_FETCH_ENABLED=true \
+  -e AI_SUMMARY_ENABLED=true \
   -e RSS_PLAYWRIGHT_FALLBACK=true \
+  -e RSS_ARTICLE_BROWSER_FALLBACK_LIMIT=1 \
+  -e TRACKED_TOPIC_BROWSER_FALLBACK_LIMIT=1 \
+  -e PLAYWRIGHT_FAILURE_THRESHOLD=3 \
+  -e PLAYWRIGHT_COOLDOWN_MS=300000 \
+  -e PLAYWRIGHT_MAX_CONCURRENCY=1 \
   -e PLAYWRIGHT_HEADLESS=true \
   -e TELEGRAM_WEBHOOK_URL= \
   -e LOG_LEVEL=info \
@@ -91,14 +99,28 @@ bun test             # 运行测试
 | `HOST` | `0.0.0.0` | 监听地址 |
 | `CORS_ORIGINS` | `http://localhost:3010` | 允许的跨域源 |
 | `RSS_CHECK_ENABLED` | `true` | 是否启用定时抓取 |
+| `RSS_ARTICLE_BODY_ENRICHMENT_ENABLED` | `true` | 是否启用文章正文增强；关闭后跳过正文抓取和基于正文的 AI 摘要 |
+| `TRACKED_TOPIC_FETCH_ENABLED` | `true` | 是否启用追踪帖子抓取检查 |
+| `AI_SUMMARY_ENABLED` | `true` | 是否启用 AI 摘要生成 |
 | `RSS_TIMEOUT` | `10000` | RSS 请求超时（ms） |
 | `RSS_PLAYWRIGHT_FALLBACK` | `true` | 普通 RSS 抓取失败时，是否启用 Playwright 浏览器兜底 |
+| `RSS_ARTICLE_BROWSER_FALLBACK_LIMIT` | `1` | 每轮 RSS 新文章正文允许触发浏览器兜底的最大次数 |
+| `TRACKED_TOPIC_BROWSER_FALLBACK_LIMIT` | `1` | 每轮帖子追踪允许触发浏览器兜底的最大次数 |
+| `PLAYWRIGHT_FAILURE_THRESHOLD` | `3` | Playwright 连续失败多少次后开启熔断 |
+| `PLAYWRIGHT_COOLDOWN_MS` | `300000` | Playwright 熔断冷却时间（ms） |
+| `PLAYWRIGHT_MAX_CONCURRENCY` | `1` | Playwright 浏览器兜底允许的全局最大并发数 |
 | `PLAYWRIGHT_HEADLESS` | `true` | Playwright 是否以无头模式运行 |
 | `LOG_LEVEL` | `info` | 日志级别 |
 
 > **RSS 源地址、抓取间隔、代理** 等配置已迁移到数据库，可在 Web 控制台 → **基础设置** 中动态修改。
 
 当 RSS 源出现 TLS、反爬、连接中断等问题时，服务会在普通 `fetch` 抓取失败后自动尝试 Playwright 浏览器兜底，以提高抓取成功率。
+
+如果你想进一步降低线上风险，可以直接关闭以下高负载功能：
+
+1. `RSS_ARTICLE_BODY_ENRICHMENT_ENABLED=false`：关闭文章正文增强
+2. `TRACKED_TOPIC_FETCH_ENABLED=false`：关闭追踪帖子抓取检查
+3. `AI_SUMMARY_ENABLED=false`：关闭 AI 摘要生成
 
 ## 🐳 部署说明
 

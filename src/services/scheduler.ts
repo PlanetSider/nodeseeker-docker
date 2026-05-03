@@ -10,6 +10,7 @@ export class SchedulerService {
     private rssIntervalId?: NodeJS.Timeout;
     private dbService: DatabaseService;
     private isRunning: boolean = false;
+    private isExecutingRSSTask: boolean = false;
 
     constructor(dbService: DatabaseService) {
         this.dbService = dbService;
@@ -74,6 +75,12 @@ export class SchedulerService {
      * 执行 RSS 抓取和推送任务
      */
     private async executeRSSTask(): Promise<void> {
+        if (this.isExecutingRSSTask) {
+            logger.scheduler('RSS 任务仍在执行，跳过本轮触发');
+            return;
+        }
+
+        this.isExecutingRSSTask = true;
         const startTime = Date.now();
         logger.task.start('RSS 任务');
 
@@ -109,10 +116,15 @@ export class SchedulerService {
                 logger.task.info(`匹配: ${pushResult.pushed} | 未匹配: ${pushResult.skipped} | 失败: ${pushResult.failed}`);
             }
 
-            const topicTrackerService = new TopicTrackerService(this.dbService);
-            const trackedReplyResult = await topicTrackerService.checkTrackedTopics();
-            if (trackedReplyResult.checked > 0) {
-                logger.task.info(`追踪帖子: ${trackedReplyResult.checked} | 新回复: ${trackedReplyResult.newReplies} | 已通知: ${trackedReplyResult.notified}`);
+            const envConfig = getEnvConfig();
+            if (envConfig.TRACKED_TOPIC_FETCH_ENABLED) {
+                const topicTrackerService = new TopicTrackerService(this.dbService);
+                const trackedReplyResult = await topicTrackerService.checkTrackedTopics();
+                if (trackedReplyResult.checked > 0) {
+                    logger.task.info(`追踪帖子: ${trackedReplyResult.checked} | 新回复: ${trackedReplyResult.newReplies} | 已通知: ${trackedReplyResult.notified}`);
+                }
+            } else {
+                logger.task.info('已关闭追踪帖子抓取，跳过本轮检查');
             }
 
             const duration = Date.now() - startTime;
@@ -122,6 +134,8 @@ export class SchedulerService {
             const duration = Date.now() - startTime;
             const errorMessage = error instanceof Error ? error.message : String(error);
             logger.warn(`RSS 任务失败 (${duration}ms): ${errorMessage}`);
+        } finally {
+            this.isExecutingRSSTask = false;
         }
     }
 

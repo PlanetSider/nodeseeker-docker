@@ -28,8 +28,29 @@ services:
       # 是否启用定时 RSS 抓取任务
       RSS_CHECK_ENABLED: true
 
+      # 是否启用文章正文增强（关闭后不抓正文，也不生成基于正文的 AI 摘要）
+      RSS_ARTICLE_BODY_ENRICHMENT_ENABLED: true
+
+      # 是否启用追踪帖子抓取检查
+      TRACKED_TOPIC_FETCH_ENABLED: true
+
+      # 是否启用 AI 摘要生成（仅在正文增强开启且成功抓到正文时生效）
+      AI_SUMMARY_ENABLED: true
+
       # 普通 RSS 抓取失败时，是否启用 Playwright 浏览器兜底
       RSS_PLAYWRIGHT_FALLBACK: true
+
+      # 每轮 RSS 新文章正文允许触发浏览器兜底的最大次数
+      RSS_ARTICLE_BROWSER_FALLBACK_LIMIT: 1
+
+      # 每轮帖子追踪检查允许触发浏览器兜底的最大次数
+      TRACKED_TOPIC_BROWSER_FALLBACK_LIMIT: 1
+
+      # Playwright 连续失败多少次后开启熔断
+      PLAYWRIGHT_FAILURE_THRESHOLD: 3
+
+      # Playwright 熔断冷却时间，单位毫秒
+      PLAYWRIGHT_COOLDOWN_MS: 300000
 
       # Playwright 是否使用无头模式运行
       PLAYWRIGHT_HEADLESS: true
@@ -42,6 +63,10 @@ services:
     volumes:
       - ./data:/usr/src/app/data
       - ./logs:/usr/src/app/logs
+    shm_size: "1gb"
+    ulimits:
+      # 禁止进程崩溃时在容器内生成 core.* 文件
+      core: 0
     networks:
       - nodeseeker_network
     logging:
